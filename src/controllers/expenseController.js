@@ -4,6 +4,7 @@ import {
     editExpense,
     removeExpense
 } from '../services/expenseService.js'
+import { fetchExpensesByDateRange } from '../services/expenseService.js'
 
 export const createExpense = async (req, res) => {
     try {
@@ -17,17 +18,22 @@ export const createExpense = async (req, res) => {
 }
 
 export const getExpenses = async (req, res) => {
-    const { mes, ano } = req.query
     const userId = req.user.id
+    const { start_date, end_date } = req.query
+
+    if (!start_date || !end_date) {
+        return res.status(400).json({ error: 'Parâmetros start_date e end_date são obrigatórios.' })
+    }
 
     try {
-        const expenses = await fetchExpensesByMonthYear(userId, mes, ano)
-        res.json(expenses)
+        const result = await fetchExpensesByDateRange(userId, start_date, end_date)
+        res.json(result)
     } catch (err) {
         console.error('Erro ao buscar despesas:', err)
         res.status(500).json({ error: 'Erro ao buscar despesas.' })
     }
 }
+
 
 
 export const updateExpense = async (req, res) => {

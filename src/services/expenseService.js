@@ -101,3 +101,14 @@ export const removeExpense = async (id, user_id) => {
     return result.rows[0]
 }
 
+export const fetchExpensesByDateRange = async (user_id, startDate, endDate) => {
+    const result = await pool.query(
+        `SELECT * FROM expenses
+     WHERE user_id = $1
+     AND data BETWEEN $2 AND $3
+     ORDER BY data DESC`,
+        [user_id, startDate, endDate]
+    )
+
+    return result.rows
+}

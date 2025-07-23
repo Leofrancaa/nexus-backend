@@ -5,6 +5,7 @@ import {
     editIncome,
     removeIncome
 } from '../services/incomeService.js'
+import { fetchIncomesByDateRange } from '../services/incomeService.js'
 
 export const createIncome = async (req, res) => {
     try {
@@ -17,18 +18,24 @@ export const createIncome = async (req, res) => {
     }
 }
 
+
 export const getIncomes = async (req, res) => {
-    const { mes, ano } = req.query
     const userId = req.user.id
+    const { start_date, end_date } = req.query
+
+    if (!start_date || !end_date) {
+        return res.status(400).json({ error: 'Parâmetros start_date e end_date são obrigatórios.' })
+    }
 
     try {
-        const result = await fetchIncomesByMonthYear(userId, mes, ano)
+        const result = await fetchIncomesByDateRange(userId, start_date, end_date)
         res.json(result)
     } catch (err) {
         console.error('Erro ao buscar receitas:', err)
         res.status(500).json({ error: 'Erro ao buscar receitas.' })
     }
 }
+
 
 
 export const updateIncome = async (req, res) => {

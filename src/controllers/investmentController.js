@@ -5,6 +5,8 @@ import {
     removeInvestment
 } from '../services/investmentService.js'
 
+import { fetchInvestmentsByDateRange } from '../services/investmentService.js'
+
 export const createInvestment = async (req, res) => {
     const user_id = req.user.id
     try {
@@ -16,18 +18,24 @@ export const createInvestment = async (req, res) => {
     }
 }
 
+
 export const getInvestments = async (req, res) => {
-    const { mes, ano } = req.query
-    const user_id = req.user.id
+    const userId = req.user.id
+    const { start_date, end_date } = req.query
+
+    if (!start_date || !end_date) {
+        return res.status(400).json({ error: 'Parâmetros start_date e end_date são obrigatórios.' })
+    }
 
     try {
-        const investments = await fetchInvestments(user_id, mes, ano)
-        res.json(investments)
+        const result = await fetchInvestmentsByDateRange(userId, start_date, end_date)
+        res.json(result)
     } catch (err) {
         console.error('Erro ao buscar investimentos:', err)
         res.status(500).json({ error: 'Erro ao buscar investimentos.' })
     }
 }
+
 
 export const updateInvestment = async (req, res) => {
     const user_id = req.user.id
