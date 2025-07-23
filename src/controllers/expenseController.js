@@ -1,14 +1,14 @@
 import {
-    createExpense,
+    addExpense,
     fetchExpensesByMonthYear,
     editExpense,
     removeExpense
 } from '../services/expenseService.js'
 
-export const addExpense = async (req, res) => {
+export const createExpense = async (req, res) => {
     try {
         const userId = req.user.id
-        const result = await createExpense({ ...req.body, user_id: userId })
+        const result = await addExpense({ ...req.body, user_id: userId })
         res.status(201).json(result)
     } catch (err) {
         console.error('Erro ao criar despesa:', err)

@@ -1,6 +1,6 @@
 import { pool } from '../database/index.js'
 
-export const createExpense = async (expenseData) => {
+export const addExpense = async (expenseData) => {
     const {
         metodo_pagamento,
         tipo,

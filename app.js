@@ -8,6 +8,7 @@ import incomeRoutes from './src/routes/incomeRoutes.js'
 import cardRoutes from './src/routes/cardRoutes.js'
 import investmentRoutes from './src/routes/investmentRoutes.js'
 import categoryRoutes from './src/routes/categoryRoutes.js'
+import thresholdRoutes from './src/routes/thresholdRoutes.js'
 
 dotenv.config()
 
@@ -22,6 +23,7 @@ app.use('/api/incomes', incomeRoutes)
 app.use('/api/cards', cardRoutes)
 app.use('/api/investments', investmentRoutes)
 app.use('/api/categories', categoryRoutes)
+app.use('/api/thresholds', thresholdRoutes)
 
 
 // Rota de teste para verificar conexão com o banco
