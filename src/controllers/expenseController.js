@@ -2,9 +2,9 @@ import {
     addExpense,
     fetchExpensesByMonthYear,
     editExpense,
-    removeExpense
+    removeExpense,
+    fetchExpensesByDateRange
 } from '../services/expenseService.js'
-import { fetchExpensesByDateRange } from '../services/expenseService.js'
 
 export const createExpense = async (req, res) => {
     try {
@@ -13,6 +13,13 @@ export const createExpense = async (req, res) => {
         res.status(201).json(result)
     } catch (err) {
         console.error('Erro ao criar despesa:', err)
+
+        // Verifica se o erro é customizado com status e message
+        if (err.status && err.message) {
+            return res.status(err.status).json({ error: err.message })
+        }
+
+        // Erro genérico
         res.status(500).json({ error: 'Erro ao criar despesa.' })
     }
 }
@@ -34,15 +41,15 @@ export const getExpenses = async (req, res) => {
     }
 }
 
-
-
 export const updateExpense = async (req, res) => {
     const userId = req.user.id
     const expenseId = req.params.id
 
     try {
         const updated = await editExpense(expenseId, req.body, userId)
-        if (!updated) return res.status(404).json({ error: 'Despesa não encontrada ou não pertence ao usuário.' })
+        if (!updated) {
+            return res.status(404).json({ error: 'Despesa não encontrada ou não pertence ao usuário.' })
+        }
         res.json(updated)
     } catch (err) {
         console.error('Erro ao atualizar despesa:', err)
@@ -56,7 +63,9 @@ export const deleteExpense = async (req, res) => {
 
     try {
         const deleted = await removeExpense(expenseId, userId)
-        if (!deleted) return res.status(404).json({ error: 'Despesa não encontrada ou não pertence ao usuário.' })
+        if (!deleted) {
+            return res.status(404).json({ error: 'Despesa não encontrada ou não pertence ao usuário.' })
+        }
         res.json({ message: 'Despesa removida com sucesso.' })
     } catch (err) {
         console.error('Erro ao excluir despesa:', err)

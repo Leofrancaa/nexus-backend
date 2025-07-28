@@ -1,15 +1,14 @@
 import { pool } from '../database/index.js'
 
-export const addCard = async ({ nome, tipo, numero, cor, user_id }) => {
+export const addCard = async ({ nome, tipo, numero, cor, limite, dia_vencimento, user_id }) => {
     const result = await pool.query(
-        `INSERT INTO cards (nome, tipo, numero, cor, user_id)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING *`,
-        [nome, tipo, numero, cor, user_id]
+        `INSERT INTO cards (nome, tipo, numero, cor, limite, dia_vencimento, user_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING *`,
+        [nome, tipo, numero, cor, limite, dia_vencimento, user_id]
     )
     return result.rows[0]
 }
-
 
 export const fetchCards = async (user_id) => {
     const result = await pool.query(
@@ -19,20 +18,21 @@ export const fetchCards = async (user_id) => {
     return result.rows
 }
 
-export const editCard = async (id, { nome, tipo, numero, cor }, user_id) => {
+export const editCard = async (id, { nome, tipo, numero, cor, limite, dia_vencimento }, user_id) => {
     const result = await pool.query(
         `UPDATE cards SET
-      nome = $1,
-      tipo = $2,
-      numero = $3,
-      cor = $4
-     WHERE id = $5 AND user_id = $6
-     RETURNING *`,
-        [nome, tipo, numero, cor, id, user_id]
+         nome = $1,
+         tipo = $2,
+         numero = $3,
+         cor = $4,
+         limite = $5,
+         dia_vencimento = $6
+         WHERE id = $7 AND user_id = $8
+         RETURNING *`,
+        [nome, tipo, numero, cor, limite, dia_vencimento, id, user_id]
     )
     return result.rows[0]
 }
-
 
 export const removeCard = async (id, user_id) => {
     const result = await pool.query(
