@@ -1,10 +1,11 @@
 import {
     addExpense,
-    fetchExpensesByMonthYear,
+    fetchExpensesByDateRange,
     editExpense,
-    removeExpense,
-    fetchExpensesByDateRange
+    removeExpense
 } from '../services/expenseService.js'
+
+import { pool } from '../database/index.js' // Necessário para getExpenseHistory
 
 export const createExpense = async (req, res) => {
     try {
@@ -14,12 +15,10 @@ export const createExpense = async (req, res) => {
     } catch (err) {
         console.error('Erro ao criar despesa:', err)
 
-        // Verifica se o erro é customizado com status e message
         if (err.status && err.message) {
             return res.status(err.status).json({ error: err.message })
         }
 
-        // Erro genérico
         res.status(500).json({ error: 'Erro ao criar despesa.' })
     }
 }
@@ -70,5 +69,25 @@ export const deleteExpense = async (req, res) => {
     } catch (err) {
         console.error('Erro ao excluir despesa:', err)
         res.status(500).json({ error: 'Erro ao excluir despesa.' })
+    }
+}
+
+// ✅ Histórico de alterações de uma despesa
+export const getExpenseHistory = async (req, res) => {
+    const { expenseId } = req.params
+    const user_id = req.user.id
+
+    try {
+        const result = await pool.query(
+            `SELECT * FROM expense_history 
+             WHERE expense_id = $1 AND user_id = $2
+             ORDER BY data_alteracao DESC`,
+            [expenseId, user_id]
+        )
+
+        res.json(result.rows)
+    } catch (err) {
+        console.error('Erro ao buscar histórico de despesa:', err)
+        res.status(500).json({ error: 'Erro ao buscar histórico.' })
     }
 }

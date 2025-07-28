@@ -1,4 +1,5 @@
 import { pool } from '../database/index.js'
+import { saveExpenseHistory } from '../utils/finance/saveExpenseHistory.js'
 
 export const addExpense = async (expenseData) => {
     const {
@@ -146,49 +147,56 @@ export const fetchExpensesByMonthYear = async (userId, mes, ano) => {
     return result.rows
 }
 
-export const editExpense = async (id, updatedData, user_id) => {
-    const {
-        metodo_pagamento,
-        tipo,
-        quantidade,
-        fixo,
-        data,
-        parcelas,
-        frequencia,
-        card_id,
-        category_id
-    } = updatedData
 
-    const result = await pool.query(
-        `UPDATE expenses SET
-            metodo_pagamento = $1,
-            tipo = $2,
-            quantidade = $3,
-            fixo = $4,
-            data = $5,
-            parcelas = $6,
-            frequencia = $7,
-            card_id = $8,
-            category_id = $9
-         WHERE id = $10 AND user_id = $11
-         RETURNING *`,
+export const editExpense = async (id, data, user_id) => {
+    // Busca a despesa atual antes de atualizar
+    const current = await pool.query(
+        'SELECT * FROM expenses WHERE id = $1 AND user_id = $2',
+        [id, user_id]
+    )
+
+    if (current.rowCount === 0) return null
+
+    // Salva o histórico da versão atual
+    await saveExpenseHistory({
+        expense_id: id,
+        user_id,
+        tipo: current.rows[0].tipo,
+        alteracao: current.rows[0]
+    })
+
+    // Atualiza a despesa
+    const updated = await pool.query(
+        `UPDATE expenses SET 
+      tipo = $1, 
+      quantidade = $2, 
+      data = $3,
+      metodo_pagamento = $4,
+      parcelas = $5,
+      fixo = $6,
+      frequencia = $7,
+      card_id = $8,
+      category_id = $9
+     WHERE id = $10 AND user_id = $11
+     RETURNING *`,
         [
-            metodo_pagamento,
-            tipo,
-            quantidade,
-            fixo,
-            data,
-            parcelas,
-            frequencia,
-            card_id,
-            category_id,
+            data.tipo,
+            data.quantidade,
+            data.data,
+            data.metodo_pagamento,
+            data.parcelas,
+            data.fixo,
+            data.frequencia,
+            data.card_id,
+            data.category_id,
             id,
             user_id
         ]
     )
 
-    return result.rows[0]
+    return updated.rows[0]
 }
+
 
 export const removeExpense = async (id, user_id) => {
     const result = await pool.query(

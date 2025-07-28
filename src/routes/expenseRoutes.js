@@ -3,7 +3,8 @@ import {
     createExpense,
     getExpenses,
     updateExpense,
-    deleteExpense
+    deleteExpense,
+    getExpenseHistory
 } from '../controllers/expenseController.js'
 
 import { authenticateToken } from '../middlewares/authMiddleware.js'
@@ -12,6 +13,7 @@ const router = express.Router()
 
 router.post('/', authenticateToken, createExpense)
 router.get('/', authenticateToken, getExpenses)
+router.get('/history/:id', authenticateToken, getExpenseHistory)
 router.put('/:id', authenticateToken, updateExpense)
 router.delete('/:id', authenticateToken, deleteExpense)
 

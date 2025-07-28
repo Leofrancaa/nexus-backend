@@ -9,6 +9,8 @@ import { getCartoesEstourados } from '../utils/finance/getCartoesEstourados.js'
 import { getResumoAnual } from '../utils/finance/getResumoAnual.js'
 import { getTopCategoriasGasto } from '../utils/finance/getTopCategoriasGasto.js'
 import { getParcelasPendentes } from '../utils/finance/getParcelasPendentes.js'
+import { getCartoesAVencer } from '../utils/finance/getCartoesAVencer.js'
+
 
 export const getDashboardData = async (req, res) => {
     const user_id = req.user.id
@@ -22,12 +24,14 @@ export const getDashboardData = async (req, res) => {
         const comparativo = await getComparativoMensal(user_id, mes, ano)
         const investimentos = await getInvestimentosTotais(user_id)
         const porCategoria = await getGastosPorCategoria(user_id, mes, ano)
-        const porCartao = await getGastosPorCartao(user_id)
+        const porCartao = await getGastosPorCartao(user_id, mes, ano)
         const saldoFuturo = await getSaldoFuturo(user_id)
         const cartoesEstourados = await getCartoesEstourados(user_id)
         const resumoAnual = await getResumoAnual(user_id, ano)
         const topCategorias = await getTopCategoriasGasto(user_id, mes, ano)
         const parcelasPendentes = await getParcelasPendentes(user_id)
+        const cartoesAVencer = await getCartoesAVencer(user_id)
+
 
         res.json({
             saldo,
@@ -40,7 +44,8 @@ export const getDashboardData = async (req, res) => {
             topCategorias,
             gastosPorCartao: porCartao,
             parcelasPendentes,
-            cartoesEstourados
+            cartoesEstourados,
+            cartoesAVencer
         })
     } catch (err) {
         console.error('Erro ao carregar dados do dashboard:', err)
