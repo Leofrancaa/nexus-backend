@@ -1,4 +1,4 @@
-import { updateUserCurrency, getUserCurrency } from '../services/userService.js'
+import { updateUserCurrency, getUserCurrency } from '../services/currencyService.js'
 
 // PUT /api/user/currency
 export const updateCurrency = async (req, res) => {

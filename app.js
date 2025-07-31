@@ -11,6 +11,8 @@ import categoryRoutes from './src/routes/categoryRoutes.js'
 import thresholdRoutes from './src/routes/thresholdRoutes.js'
 import dashboardRoutes from './src/routes/dashboardRoutes.js'
 import userRoutes from './src/routes/userRoutes.js'
+import currencyRoutes from './src/routes/currencyRoutes.js'
+
 import cookieParser from 'cookie-parser'
 
 dotenv.config()
@@ -35,7 +37,9 @@ app.use('/api/investments', investmentRoutes)
 app.use('/api/categories', categoryRoutes)
 app.use('/api/thresholds', thresholdRoutes)
 app.use('/api/dashboard', dashboardRoutes)
-app.use('/api/users', userRoutes)
+app.use('/api/users', currencyRoutes)
+app.use("/api", userRoutes);
+
 
 
 // Rota de teste para verificar conexão com o banco
