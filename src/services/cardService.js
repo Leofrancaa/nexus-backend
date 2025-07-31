@@ -12,10 +12,28 @@ export const addCard = async ({ nome, tipo, numero, cor, limite, dia_vencimento,
 
 export const fetchCards = async (user_id) => {
     const result = await pool.query(
-        `SELECT * FROM cards WHERE user_id = $1 ORDER BY id DESC`,
+        `SELECT 
+        c.*,
+        COALESCE(SUM(e.quantidade), 0) AS gasto_total,
+        CASE
+          WHEN CURRENT_DATE <= make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int, EXTRACT(MONTH FROM CURRENT_DATE)::int, c.dia_vencimento)
+          THEN make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int, EXTRACT(MONTH FROM CURRENT_DATE)::int, c.dia_vencimento)
+          ELSE make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int, EXTRACT(MONTH FROM CURRENT_DATE)::int + 1, c.dia_vencimento)
+        END AS proximo_vencimento
+     FROM cards c
+     LEFT JOIN expenses e ON e.card_id = c.id AND e.user_id = $1
+     WHERE c.user_id = $1
+     GROUP BY c.id
+     ORDER BY c.id DESC`,
         [user_id]
-    )
-    return result.rows
+    );
+
+    // Conversão: garante que os valores numéricos venham como `number`
+    return result.rows.map(card => ({
+        ...card,
+        limite: Number(card.limite),
+        gasto_total: Number(card.gasto_total),
+    }));
 }
 
 export const editCard = async (id, { nome, tipo, numero, cor, limite, dia_vencimento }, user_id) => {
@@ -41,3 +59,14 @@ export const removeCard = async (id, user_id) => {
     )
     return result.rows[0]
 }
+
+export const getGastoTotalDoCartao = async (card_id, user_id) => {
+    const result = await pool.query(
+        `SELECT COALESCE(SUM(quantidade), 0) AS total
+     FROM expenses
+     WHERE card_id = $1 AND user_id = $2`,
+        [card_id, user_id]
+    );
+
+    return Number(result.rows[0].total);
+};
