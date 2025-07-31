@@ -23,23 +23,35 @@ export const registerUser = async (req, res) => {
 }
 
 export const loginUser = async (req, res) => {
-    const { email, senha } = req.body
+    const { email, senha } = req.body;
 
     try {
-        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email])
-        const user = result.rows[0]
+        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        const user = result.rows[0];
 
-        if (!user) return res.status(400).json({ error: 'Usuário não encontrado.' })
+        if (!user) return res.status(400).json({ error: 'Usuário não encontrado.' });
 
-        const isPasswordCorrect = await bcrypt.compare(senha, user.senha)
+        const isPasswordCorrect = await bcrypt.compare(senha, user.senha);
+        if (!isPasswordCorrect) return res.status(401).json({ error: 'Senha incorreta.' });
 
-        if (!isPasswordCorrect) return res.status(401).json({ error: 'Senha incorreta.' })
+        const token = jwt.sign(
+            { id: user.id, email: user.email },
+            JWT_SECRET,
+            { expiresIn: '2h' }
+        );
 
-        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '2h' })
+        // ✅ Envia como cookie seguro
+        res
+            .cookie('token', token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 2 * 60 * 60 * 1000 // 2 horas
+            })
+            .json({ message: 'Login realizado com sucesso' });
 
-        res.json({ token, user: { id: user.id, nome: user.nome, email: user.email } })
     } catch (error) {
-        console.error(error)
-        res.status(500).json({ error: 'Erro ao fazer login.' })
+        console.error(error);
+        res.status(500).json({ error: 'Erro ao fazer login.' });
     }
-}
+};

@@ -2,7 +2,8 @@ import {
     addExpense,
     fetchExpensesByDateRange,
     editExpense,
-    removeExpense
+    removeExpense,
+    getTotalPorCategoria
 } from '../services/expenseService.js'
 
 import { pool } from '../database/index.js' // Necessário para getExpenseHistory
@@ -91,3 +92,19 @@ export const getExpenseHistory = async (req, res) => {
         res.status(500).json({ error: 'Erro ao buscar histórico.' })
     }
 }
+
+
+export const getTotalByCategoria = async (req, res) => {
+    const user_id = req.user.id;
+    const category_id = parseInt(req.params.categoryId);
+    const mes = new Date().getMonth() + 1;
+    const ano = new Date().getFullYear();
+
+    try {
+        const total = await getTotalPorCategoria(user_id, category_id, mes, ano);
+        res.json({ total });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Erro ao calcular total da categoria" });
+    }
+};

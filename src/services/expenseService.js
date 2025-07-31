@@ -218,3 +218,18 @@ export const fetchExpensesByDateRange = async (user_id, startDate, endDate) => {
 
     return result.rows
 }
+
+
+export const getTotalPorCategoria = async (user_id, category_id, mes, ano) => {
+    const result = await pool.query(
+        `SELECT COALESCE(SUM(quantidade), 0) AS total
+     FROM expenses
+     WHERE user_id = $1
+       AND category_id = $2
+       AND EXTRACT(MONTH FROM data) = $3
+       AND EXTRACT(YEAR FROM data) = $4`,
+        [user_id, category_id, mes, ano]
+    );
+
+    return parseFloat(result.rows[0].total);
+};

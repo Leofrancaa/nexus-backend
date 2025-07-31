@@ -11,13 +11,21 @@ import categoryRoutes from './src/routes/categoryRoutes.js'
 import thresholdRoutes from './src/routes/thresholdRoutes.js'
 import dashboardRoutes from './src/routes/dashboardRoutes.js'
 import userRoutes from './src/routes/userRoutes.js'
+import cookieParser from 'cookie-parser'
 
 dotenv.config()
 
 const app = express()
 
-app.use(cors())
+const corsOptions = {
+    origin: "http://localhost:3000", // ✅ origem exata
+    credentials: true,               // ✅ permite envio de cookies
+};
+
+app.use(cors(corsOptions));
 app.use(express.json())
+
+app.use(cookieParser())
 
 app.use('/auth', authRoutes)
 app.use('/api/expenses', expenseRoutes)
