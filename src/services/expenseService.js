@@ -15,7 +15,10 @@ export const addExpense = async (expenseData) => {
         category_id,
     } = expenseData;
 
-    const baseDate = data ? new Date(data) : new Date();
+    const baseDate = data
+        ? new Date(`${data}T00:00:00`)  // força dia correto sem risco de fuso
+        : new Date();
+
     const formattedBaseDate = baseDate.toISOString().split('T')[0];
 
     if (metodo_pagamento === 'cartao de credito' && card_id) {
@@ -106,25 +109,45 @@ export const addExpense = async (expenseData) => {
         );
     }
 
-    if (fixo) {
-        const currentMonth = baseDate.getMonth();
-        const year = baseDate.getFullYear();
-        const day = baseDate.getDate();
+    console.log("=== DESPESA FIXA ===");
+    console.log("Data base:", baseDate.toISOString());
+    console.log("Dia:", baseDate.getDate());
+    console.log("Mês:", baseDate.getMonth());
+    console.log("Ano:", baseDate.getFullYear());
 
-        for (let month = currentMonth + 1; month < 12; month++) {
-            const newDate = new Date(year, month, day);
+
+    if (fixo) {
+        const diaOriginal = baseDate.getDate();
+        const mesOriginal = baseDate.getMonth(); // 0-11
+        const ano = baseDate.getFullYear();
+
+        const diasNoMesOriginal = new Date(ano, mesOriginal + 1, 0).getDate();
+        const ehUltimoDiaMes = diaOriginal === diasNoMesOriginal;
+
+        for (let mes = mesOriginal + 1; mes <= 11; mes++) {
+            const diasNoMesAlvo = new Date(ano, mes + 1, 0).getDate();
+
+            const diaParaInserir = ehUltimoDiaMes
+                ? diasNoMesAlvo // se for último dia do mês original, replicar no último
+                : diaOriginal > diasNoMesAlvo
+                    ? null // se o mês não tem esse dia, pula
+                    : diaOriginal;
+
+            if (!diaParaInserir) continue;
+
+            const data = `${ano}-${String(mes + 1).padStart(2, "0")}-${String(diaParaInserir).padStart(2, "0")}`;
 
             await pool.query(
                 `INSERT INTO expenses (
-          metodo_pagamento, tipo, quantidade, fixo, data,
-          parcelas, frequencia, user_id, card_id, category_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        metodo_pagamento, tipo, quantidade, fixo, data,
+        parcelas, frequencia, user_id, card_id, category_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
                 [
                     metodo_pagamento,
                     tipo,
                     quantidade,
                     true,
-                    newDate.toISOString().split("T")[0],
+                    data,
                     parcelas,
                     frequencia,
                     user_id,
@@ -135,26 +158,46 @@ export const addExpense = async (expenseData) => {
         }
     }
 
+
+
+
+
+
     return baseExpense;
 };
 
 export const fetchExpensesByMonthYear = async (userId, mes, ano) => {
     const result = await pool.query(
-        `SELECT * FROM expenses
-     WHERE user_id = $1 AND EXTRACT(MONTH FROM data) = $2 AND EXTRACT(YEAR FROM data) = $3
-     ORDER BY data DESC`,
+        `SELECT 
+        e.*, 
+        c.nome AS categoria_nome, 
+        c.cor AS cor_categoria
+     FROM expenses e
+     LEFT JOIN categories c ON e.category_id = c.id
+     WHERE e.user_id = $1
+       AND EXTRACT(MONTH FROM e.data) = $2
+       AND EXTRACT(YEAR FROM e.data) = $3
+     ORDER BY e.data DESC`,
         [userId, mes, ano]
     );
 
     return result.rows;
 };
 
+
 export const fetchExpensesByDateRange = async (user_id, startDate, endDate) => {
     const result = await pool.query(
-        `SELECT * FROM expenses
-     WHERE user_id = $1
-     AND data BETWEEN $2 AND $3
-     ORDER BY data DESC`,
+        `SELECT 
+  e.*, 
+  c.id AS category_id,
+  c.nome AS categoria_nome, 
+  c.cor AS cor_categoria
+FROM expenses e
+LEFT JOIN categories c ON e.category_id = c.id
+WHERE e.user_id = $1
+  AND e.data BETWEEN $2 AND $3
+ORDER BY e.data DESC
+`,
         [user_id, startDate, endDate]
     );
 
@@ -228,4 +271,35 @@ export const getTotalPorCategoria = async (user_id, category_id, mes, ano) => {
     );
 
     return parseFloat(result.rows[0].total);
+};
+
+export const getTotalDespesasDoMes = async (user_id, mes, ano) => {
+    const result = await pool.query(
+        `SELECT COALESCE(SUM(quantidade), 0) AS total
+         FROM expenses
+         WHERE user_id = $1
+         AND EXTRACT(MONTH FROM data) = $2
+         AND EXTRACT(YEAR FROM data) = $3`,
+        [user_id, mes, ano]
+    );
+
+    return parseFloat(result.rows[0].total);
+};
+
+
+export const getDespesasStats = async (user_id, mes, ano) => {
+    const result = await pool.query(
+        `SELECT 
+            COALESCE(SUM(quantidade), 0) AS total,
+            COUNT(*) FILTER (WHERE fixo = true) AS fixas,
+            COUNT(*) AS transacoes,
+            COALESCE(AVG(quantidade), 0) AS media
+        FROM expenses
+        WHERE user_id = $1
+          AND EXTRACT(MONTH FROM data) = $2
+          AND EXTRACT(YEAR FROM data) = $3`,
+        [user_id, mes, ano]
+    );
+
+    return result.rows[0];
 };

@@ -1,14 +1,17 @@
 import {
     addExpense,
     fetchExpensesByDateRange,
+    fetchExpensesByMonthYear,
     editExpense,
     removeExpense,
-    getTotalPorCategoria
+    getTotalPorCategoria,
+    getTotalDespesasDoMes,
+    getDespesasStats
 } from '../services/expenseService.js';
 
 import { pool } from '../database/index.js';
 
-// ✅ Criar despesa
+// Criar despesa
 export const createExpense = async (req, res) => {
     try {
         const userId = req.user.id;
@@ -16,16 +19,14 @@ export const createExpense = async (req, res) => {
         res.status(201).json(result);
     } catch (err) {
         console.error('Erro ao criar despesa:', err);
-
         if (err.status && err.message) {
             return res.status(err.status).json({ error: err.message });
         }
-
         res.status(500).json({ error: 'Erro ao criar despesa.' });
     }
 };
 
-// ✅ Buscar despesas por intervalo de datas
+// Buscar despesas por intervalo de datas
 export const getExpenses = async (req, res) => {
     const userId = req.user.id;
     const { start_date, end_date } = req.query;
@@ -43,7 +44,26 @@ export const getExpenses = async (req, res) => {
     }
 };
 
-// ✅ Atualizar despesa
+// ✅ Buscar despesas do mês atual (novo)
+export const getExpensesByMonth = async (req, res) => {
+    const user_id = req.user.id;
+    const mes = parseInt(req.query.mes);
+    const ano = parseInt(req.query.ano);
+
+    if (!mes || !ano) {
+        return res.status(400).json({ error: "Parâmetros 'mes' e 'ano' são obrigatórios." });
+    }
+
+    try {
+        const result = await fetchExpensesByMonthYear(user_id, mes, ano);
+        res.json(result); // ✅ retorna array direto
+    } catch (err) {
+        console.error("Erro ao buscar despesas do mês:", err);
+        res.status(500).json({ error: "Erro ao buscar despesas." });
+    }
+};
+
+// Atualizar despesa
 export const updateExpense = async (req, res) => {
     const userId = req.user.id;
     const expenseId = req.params.id;
@@ -60,7 +80,7 @@ export const updateExpense = async (req, res) => {
     }
 };
 
-// ✅ Deletar despesa
+// Deletar despesa
 export const deleteExpense = async (req, res) => {
     const userId = req.user.id;
     const expenseId = req.params.id;
@@ -77,7 +97,7 @@ export const deleteExpense = async (req, res) => {
     }
 };
 
-// ✅ Histórico de alterações de uma despesa
+// Histórico de alterações
 export const getExpenseHistory = async (req, res) => {
     const { expenseId } = req.params;
     const user_id = req.user.id;
@@ -85,8 +105,8 @@ export const getExpenseHistory = async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT * FROM expense_history 
-             WHERE expense_id = $1 AND user_id = $2
-             ORDER BY data_alteracao DESC`,
+       WHERE expense_id = $1 AND user_id = $2
+       ORDER BY data_alteracao DESC`,
             [expenseId, user_id]
         );
         res.json(result.rows);
@@ -96,7 +116,7 @@ export const getExpenseHistory = async (req, res) => {
     }
 };
 
-// ✅ Total da categoria no mês atual
+// Total por categoria no mês atual
 export const getTotalByCategoria = async (req, res) => {
     const user_id = req.user.id;
     const category_id = parseInt(req.params.categoryId);
@@ -109,5 +129,43 @@ export const getTotalByCategoria = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Erro ao calcular total da categoria" });
+    }
+};
+
+// ✅ Total de despesas do mês (para sumário)
+export const getTotalExpensesMonth = async (req, res) => {
+    const user_id = req.user.id;
+    const mes = parseInt(req.query.mes);
+    const ano = parseInt(req.query.ano);
+
+    if (!mes || !ano) {
+        return res.status(400).json({ error: "Parâmetros 'mes' e 'ano' são obrigatórios." });
+    }
+
+    try {
+        const total = await getTotalDespesasDoMes(user_id, mes, ano);
+        res.json({ total });
+    } catch (error) {
+        console.error('Erro ao buscar total mensal de despesas:', error);
+        res.status(500).json({ error: "Erro ao buscar total mensal de despesas" });
+    }
+};
+
+
+export const getExpenseStats = async (req, res) => {
+    const user_id = req.user.id;
+    const mes = parseInt(req.query.month);
+    const ano = parseInt(req.query.year);
+
+    if (!mes || !ano) {
+        return res.status(400).json({ error: "Parâmetros 'mes' e 'ano' são obrigatórios." });
+    }
+
+    try {
+        const stats = await getDespesasStats(user_id, mes, ano);
+        res.json(stats);
+    } catch (error) {
+        console.error("Erro ao buscar estatísticas:", error);
+        res.status(500).json({ error: "Erro ao buscar estatísticas de despesas." });
     }
 };
