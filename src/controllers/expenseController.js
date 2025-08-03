@@ -170,3 +170,36 @@ export const getExpenseStats = async (req, res) => {
         res.status(500).json({ error: "Erro ao buscar estatísticas de despesas." });
     }
 };
+
+export const getResumoCategorias = async (req, res) => {
+    const { mes, ano } = req.query;
+    const user_id = req.user.id;
+
+
+    const { rows } = await pool.query(
+        `
+    SELECT 
+      c.nome,
+      c.cor,
+      COUNT(e.id) as quantidade,
+      SUM(e.quantidade) as total
+    FROM expenses e
+    JOIN categories c ON c.id = e.category_id
+    WHERE e.user_id = $1 AND EXTRACT(MONTH FROM e.data) = $2 AND EXTRACT(YEAR FROM e.data) = $3
+    GROUP BY c.nome, c.cor
+    `,
+        [user_id, mes, ano]
+    );
+
+    const totalGeral = rows.reduce((acc, r) => acc + Number(r.total), 0);
+
+    const dados = rows.map((r) => ({
+        nome: r.nome,
+        cor: r.cor,
+        quantidade: Number(r.quantidade),
+        total: Number(r.total),
+        percentual: (Number(r.total) / totalGeral) * 100,
+    }));
+
+    res.json(dados);
+};

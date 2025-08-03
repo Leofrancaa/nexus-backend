@@ -13,10 +13,11 @@ export const addExpense = async (expenseData) => {
         user_id,
         card_id,
         category_id,
+        observacoes, // ✅ novo campo
     } = expenseData;
 
     const baseDate = data
-        ? new Date(`${data}T00:00:00`)  // força dia correto sem risco de fuso
+        ? new Date(`${data}T00:00:00`)
         : new Date();
 
     const formattedBaseDate = baseDate.toISOString().split('T')[0];
@@ -41,7 +42,7 @@ export const addExpense = async (expenseData) => {
         }
     }
 
-    // Parcelada
+    // 🔁 Parcelada
     if (metodo_pagamento === 'cartao de credito' && parcelas > 1 && card_id) {
         const valorParcela = quantidade / parcelas;
 
@@ -52,8 +53,8 @@ export const addExpense = async (expenseData) => {
             await pool.query(
                 `INSERT INTO expenses (
           metodo_pagamento, tipo, quantidade, fixo, data,
-          parcelas, frequencia, user_id, card_id, category_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          parcelas, frequencia, user_id, card_id, category_id, observacoes
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
                 [
                     metodo_pagamento,
                     `${tipo} (${i + 1}/${parcelas})`,
@@ -65,6 +66,7 @@ export const addExpense = async (expenseData) => {
                     user_id,
                     card_id,
                     category_id,
+                    observacoes || null,
                 ]
             );
         }
@@ -80,11 +82,12 @@ export const addExpense = async (expenseData) => {
         };
     }
 
+    // 🔁 Despesa comum
     const result = await pool.query(
         `INSERT INTO expenses (
       metodo_pagamento, tipo, quantidade, fixo, data,
-      parcelas, frequencia, user_id, card_id, category_id
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      parcelas, frequencia, user_id, card_id, category_id, observacoes
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     RETURNING *`,
         [
             metodo_pagamento,
@@ -97,6 +100,7 @@ export const addExpense = async (expenseData) => {
             user_id,
             card_id,
             category_id,
+            observacoes || null,
         ]
     );
 
@@ -109,13 +113,7 @@ export const addExpense = async (expenseData) => {
         );
     }
 
-    console.log("=== DESPESA FIXA ===");
-    console.log("Data base:", baseDate.toISOString());
-    console.log("Dia:", baseDate.getDate());
-    console.log("Mês:", baseDate.getMonth());
-    console.log("Ano:", baseDate.getFullYear());
-
-
+    // 🔁 Despesa fixa replicada até dezembro
     if (fixo) {
         const diaOriginal = baseDate.getDate();
         const mesOriginal = baseDate.getMonth(); // 0-11
@@ -128,9 +126,9 @@ export const addExpense = async (expenseData) => {
             const diasNoMesAlvo = new Date(ano, mes + 1, 0).getDate();
 
             const diaParaInserir = ehUltimoDiaMes
-                ? diasNoMesAlvo // se for último dia do mês original, replicar no último
+                ? diasNoMesAlvo
                 : diaOriginal > diasNoMesAlvo
-                    ? null // se o mês não tem esse dia, pula
+                    ? null
                     : diaOriginal;
 
             if (!diaParaInserir) continue;
@@ -139,9 +137,9 @@ export const addExpense = async (expenseData) => {
 
             await pool.query(
                 `INSERT INTO expenses (
-        metodo_pagamento, tipo, quantidade, fixo, data,
-        parcelas, frequencia, user_id, card_id, category_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          metodo_pagamento, tipo, quantidade, fixo, data,
+          parcelas, frequencia, user_id, card_id, category_id, observacoes
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
                 [
                     metodo_pagamento,
                     tipo,
@@ -153,18 +151,15 @@ export const addExpense = async (expenseData) => {
                     user_id,
                     card_id,
                     category_id,
+                    observacoes || null,
                 ]
             );
         }
     }
 
-
-
-
-
-
     return baseExpense;
 };
+
 
 export const fetchExpensesByMonthYear = async (userId, mes, ano) => {
     const result = await pool.query(
