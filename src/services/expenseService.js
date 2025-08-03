@@ -206,23 +206,37 @@ ORDER BY e.data DESC
 
 export const editExpense = async (id, data, user_id) => {
     const current = await pool.query(
-        'SELECT * FROM expenses WHERE id = $1 AND user_id = $2',
+        `SELECT * FROM expenses WHERE id = $1 AND user_id = $2`,
         [id, user_id]
     );
 
     if (current.rowCount === 0) return null;
 
+    const original = current.rows[0];
+
+    // 🔒 Bloqueio de edição para despesas no cartão
+    if (original.metodo_pagamento === "cartao de credito") {
+        throw {
+            status: 400,
+            message: "Despesas no cartão de crédito não podem ser editadas.",
+        };
+    }
+
     await saveExpenseHistory({
         expense_id: id,
         user_id,
-        tipo: current.rows[0].tipo,
-        alteracao: current.rows[0]
+        tipo: original.tipo,
+        alteracao: original,
     });
 
-    const updated = await pool.query(
+    const novaData = new Date(data.data);
+    const ano = novaData.getFullYear();
+
+    // Atualiza a despesa atual
+    const updatedMain = await pool.query(
         `UPDATE expenses SET 
-      tipo = $1, 
-      quantidade = $2, 
+      tipo = $1,
+      quantidade = $2,
       data = $3,
       metodo_pagamento = $4,
       parcelas = $5,
@@ -237,27 +251,136 @@ export const editExpense = async (id, data, user_id) => {
             data.quantidade,
             data.data,
             data.metodo_pagamento,
-            data.parcelas,
-            data.fixo,
-            data.frequencia,
-            data.card_id,
-            data.category_id,
+            data.parcelas || null,
+            data.fixo || false,
+            data.frequencia || null,
+            data.card_id || null,
+            data.category_id || null,
             id,
-            user_id
+            user_id,
         ]
     );
 
-    return updated.rows[0];
-};
+    // Atualiza subsequentes se for fixa
+    if (original.fixo) {
+        const result = await pool.query(
+            `UPDATE expenses
+       SET tipo = $1,
+           quantidade = $2,
+           metodo_pagamento = $3,
+           parcelas = $4,
+           frequencia = $5,
+           card_id = $6,
+           category_id = $7
+       WHERE user_id = $8
+         AND tipo = $9
+         AND fixo = true
+         AND EXTRACT(YEAR FROM data) = $10
+         AND DATE(data) > DATE($11)
+       RETURNING *`,
+            [
+                data.tipo,
+                data.quantidade,
+                data.metodo_pagamento,
+                data.parcelas || null,
+                data.frequencia || null,
+                data.card_id || null,
+                data.category_id || null,
+                user_id,
+                original.tipo,
+                ano,
+                data.data,
+            ]
+        );
 
+        console.log("Atualizadas subsequentes:", result.rowCount);
+    }
+
+    return updatedMain.rows[0];
+};
 export const removeExpense = async (id, user_id) => {
     const result = await pool.query(
+        `SELECT * FROM expenses WHERE id = $1 AND user_id = $2`,
+        [id, user_id]
+    );
+
+    if (result.rowCount === 0) return null;
+
+    const expense = result.rows[0];
+
+    const {
+        tipo,
+        fixo,
+        metodo_pagamento,
+        card_id,
+        quantidade,
+        parcelas,
+    } = expense;
+
+    // 🔒 Se for parcelada no cartão de crédito, exclui todas da mesma série
+    if (metodo_pagamento === "cartao de credito" && parcelas > 1 && card_id) {
+        const parcelasToRemove = await pool.query(
+            `DELETE FROM expenses
+       WHERE user_id = $1 AND tipo LIKE $2 AND card_id = $3 AND parcelas = $4
+       RETURNING *`,
+            [user_id, `${tipo.split(" (")[0]}%`, card_id, parcelas]
+        );
+
+        const total = parcelasToRemove.rows.reduce((sum, e) => sum + Number(e.quantidade), 0);
+
+        await pool.query(
+            `UPDATE cards SET limite_disponivel = limite_disponivel + $1
+       WHERE id = $2 AND user_id = $3`,
+            [total, card_id, user_id]
+        );
+
+        return parcelasToRemove.rows;
+    }
+
+    // 🔁 Se for despesa fixa (de qualquer tipo)
+    if (fixo) {
+        const removidas = await pool.query(
+            `DELETE FROM expenses WHERE user_id = $1 AND tipo = $2 AND fixo = true RETURNING *`,
+            [user_id, tipo]
+        );
+
+        // Se for cartão de crédito, devolver total removido
+        if (metodo_pagamento === "cartao de credito" && card_id) {
+            const total = removidas.rows.reduce((sum, e) => sum + Number(e.quantidade), 0);
+
+            await pool.query(
+                `UPDATE cards SET limite_disponivel = limite_disponivel + $1
+         WHERE id = $2 AND user_id = $3`,
+                [total, card_id, user_id]
+            );
+        }
+
+        return removidas.rows;
+    }
+
+    // 🔁 Caso comum (não parcelada e não fixa)
+    const deleted = await pool.query(
         `DELETE FROM expenses WHERE id = $1 AND user_id = $2 RETURNING *`,
         [id, user_id]
     );
 
-    return result.rows[0];
+    const item = deleted.rows[0];
+
+    if (
+        item &&
+        item.metodo_pagamento === "cartao de credito" &&
+        item.card_id
+    ) {
+        await pool.query(
+            `UPDATE cards SET limite_disponivel = limite_disponivel + $1
+       WHERE id = $2 AND user_id = $3`,
+            [item.quantidade, item.card_id, user_id]
+        );
+    }
+
+    return item;
 };
+
 
 export const getTotalPorCategoria = async (user_id, category_id, mes, ano) => {
     const result = await pool.query(
@@ -287,19 +410,26 @@ export const getTotalDespesasDoMes = async (user_id, mes, ano) => {
 };
 
 
-export const getDespesasStats = async (user_id, mes, ano) => {
-    const result = await pool.query(
-        `SELECT 
-            COALESCE(SUM(quantidade), 0) AS total,
-            COUNT(*) FILTER (WHERE fixo = true) AS fixas,
-            COUNT(*) AS transacoes,
-            COALESCE(AVG(quantidade), 0) AS media
-        FROM expenses
-        WHERE user_id = $1
-          AND EXTRACT(MONTH FROM data) = $2
-          AND EXTRACT(YEAR FROM data) = $3`,
-        [user_id, mes, ano]
-    );
+export const getDespesasStats = async (user_id, mes, ano, categoriaId) => {
+    let query = `
+    SELECT 
+      COALESCE(SUM(quantidade), 0) AS total,
+      COUNT(*) FILTER (WHERE fixo = true) AS fixas,
+      COUNT(*) AS transacoes,
+      COALESCE(AVG(quantidade), 0) AS media
+    FROM expenses
+    WHERE user_id = $1
+      AND EXTRACT(MONTH FROM data) = $2
+      AND EXTRACT(YEAR FROM data) = $3
+  `;
 
+    const params = [user_id, mes, ano];
+
+    if (categoriaId) {
+        query += ` AND category_id = $4`;
+        params.push(categoriaId);
+    }
+
+    const result = await pool.query(query, params);
     return result.rows[0];
 };

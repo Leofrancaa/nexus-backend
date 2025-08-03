@@ -156,13 +156,14 @@ export const getExpenseStats = async (req, res) => {
     const user_id = req.user.id;
     const mes = parseInt(req.query.month);
     const ano = parseInt(req.query.year);
+    const categoriaId = req.query.categoryId ? parseInt(req.query.categoryId) : null;
 
     if (!mes || !ano) {
         return res.status(400).json({ error: "Parâmetros 'mes' e 'ano' são obrigatórios." });
     }
 
     try {
-        const stats = await getDespesasStats(user_id, mes, ano);
+        const stats = await getDespesasStats(user_id, mes, ano, categoriaId);
         res.json(stats);
     } catch (error) {
         console.error("Erro ao buscar estatísticas:", error);
