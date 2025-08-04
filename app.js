@@ -12,6 +12,7 @@ import thresholdRoutes from './src/routes/thresholdRoutes.js'
 import dashboardRoutes from './src/routes/dashboardRoutes.js'
 import userRoutes from './src/routes/userRoutes.js'
 import currencyRoutes from './src/routes/currencyRoutes.js'
+import planRoutes from "./src/routes/planRoutes.js";
 
 import cookieParser from 'cookie-parser'
 
@@ -39,6 +40,7 @@ app.use('/api/thresholds', thresholdRoutes)
 app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/users', currencyRoutes)
 app.use("/api", userRoutes);
+app.use("/api/plans", planRoutes);
 
 
 

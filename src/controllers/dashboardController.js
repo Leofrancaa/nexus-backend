@@ -30,7 +30,7 @@ export const getDashboardData = async (req, res) => {
         const resumoAnual = await getResumoAnual(user_id, ano)
         const topCategorias = await getTopCategoriasGasto(user_id, mes, ano)
         const parcelasPendentes = await getParcelasPendentes(user_id)
-        const cartoesAVencer = await getCartoesAVencer(user_id)
+        const cartoesAVencer = await getCartoesAVencer(user_id, mes, ano)
 
 
         res.json({
