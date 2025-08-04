@@ -10,15 +10,23 @@ export const addCategory = async ({ nome, cor, tipo, parent_id, user_id }) => {
     return result.rows[0]
 }
 
-export const fetchCategories = async (user_id) => {
-    const result = await pool.query(
-        `SELECT * FROM categories
-     WHERE user_id = $1
-     ORDER BY parent_id NULLS FIRST, nome`,
-        [user_id]
-    )
-    return result.rows
-}
+export const fetchCategories = async (user_id, tipo) => {
+    let query = `
+        SELECT * FROM categories
+        WHERE user_id = $1
+    `;
+    const params = [user_id];
+
+    if (tipo === 'despesa' || tipo === 'receita') {
+        query += ` AND tipo = $2`;
+        params.push(tipo);
+    }
+
+    query += ` ORDER BY parent_id NULLS FIRST, nome`;
+
+    const result = await pool.query(query, params);
+    return result.rows;
+};
 
 export const editCategory = async (id, { nome, cor, tipo, parent_id }, user_id) => {
     const result = await pool.query(

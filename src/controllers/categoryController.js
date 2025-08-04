@@ -18,13 +18,17 @@ export const createCategory = async (req, res) => {
 
 export const getCategories = async (req, res) => {
     try {
-        const categories = await fetchCategories(req.user.id)
-        res.json(categories)
+        const user_id = req.user.id;
+        const { tipo } = req.query; // 👈 pega o tipo da query
+
+        const categories = await fetchCategories(user_id, tipo); // 👈 envia o tipo para o service
+        res.json(categories);
     } catch (err) {
-        console.error('Erro ao buscar categorias:', err)
-        res.status(500).json({ error: 'Erro ao buscar categorias.' })
+        console.error('Erro ao buscar categorias:', err);
+        res.status(500).json({ error: 'Erro ao buscar categorias.' });
     }
-}
+};
+
 
 export const updateCategory = async (req, res) => {
     const user_id = req.user.id

@@ -178,18 +178,24 @@ export const getResumoCategorias = async (req, res) => {
 
     const { rows } = await pool.query(
         `
-    SELECT 
-      c.nome,
-      c.cor,
-      COUNT(e.id) as quantidade,
-      SUM(e.quantidade) as total
-    FROM expenses e
-    JOIN categories c ON c.id = e.category_id
-    WHERE e.user_id = $1 AND EXTRACT(MONTH FROM e.data) = $2 AND EXTRACT(YEAR FROM e.data) = $3
-    GROUP BY c.nome, c.cor
-    `,
+  SELECT 
+    c_pai.id,
+    c_pai.nome,
+    c_pai.cor,
+    COUNT(e.id) AS quantidade,
+    SUM(e.quantidade) AS total
+  FROM categories c_pai
+  LEFT JOIN categories c_sub ON c_sub.parent_id = c_pai.id
+  LEFT JOIN expenses e ON e.category_id = c_pai.id OR e.category_id = c_sub.id
+  WHERE c_pai.user_id = $1
+    AND c_pai.parent_id IS NULL
+    AND EXTRACT(MONTH FROM e.data) = $2 
+    AND EXTRACT(YEAR FROM e.data) = $3
+  GROUP BY c_pai.id, c_pai.nome, c_pai.cor
+  `,
         [user_id, mes, ano]
     );
+
 
     const totalGeral = rows.reduce((acc, r) => acc + Number(r.total), 0);
 
