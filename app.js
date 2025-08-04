@@ -13,6 +13,9 @@ import dashboardRoutes from './src/routes/dashboardRoutes.js'
 import userRoutes from './src/routes/userRoutes.js'
 import currencyRoutes from './src/routes/currencyRoutes.js'
 import planRoutes from "./src/routes/planRoutes.js";
+import financeRoutes from './src/routes/financeRoutes.js';
+
+
 
 import cookieParser from 'cookie-parser'
 
@@ -41,8 +44,7 @@ app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/users', currencyRoutes)
 app.use("/api", userRoutes);
 app.use("/api/plans", planRoutes);
-
-
+app.use('/api/finance', financeRoutes);
 
 // Rota de teste para verificar conexão com o banco
 app.get('/ping', async (req, res) => {

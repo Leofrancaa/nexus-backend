@@ -1,18 +1,15 @@
-import express from 'express'
+import express from 'express';
 import {
     createInvestment,
     getInvestments,
-    updateInvestment,
-    deleteInvestment
-} from '../controllers/investmentController.js'
+    getInvestmentStats,
+} from '../controllers/investmentController.js';
+import { authenticateToken } from '../middlewares/authMiddleware.js';
 
-import { authenticateToken } from '../middlewares/authMiddleware.js'
+const router = express.Router();
 
-const router = express.Router()
+router.get('/stats', authenticateToken, getInvestmentStats);
+router.post('/', authenticateToken, createInvestment);
+router.get('/', authenticateToken, getInvestments);
 
-router.post('/', authenticateToken, createInvestment)
-router.get('/', authenticateToken, getInvestments)
-router.put('/:id', authenticateToken, updateInvestment)
-router.delete('/:id', authenticateToken, deleteInvestment)
-
-export default router
+export default router;

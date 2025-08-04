@@ -1,59 +1,52 @@
-import { pool } from '../database/index.js'
+import { pool } from '../database/index.js';
 
-export const addInvestment = async ({ tipo, nome, quantidade, descricao, data, user_id }) => {
+export const addInvestment = async ({ ativo, descricao, quantidade, valor_investido, data, observacoes, user_id }) => {
     const result = await pool.query(
-        `INSERT INTO investments (tipo, nome, quantidade, descricao, data, user_id)
-     VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO investments (ativo, descricao, quantidade, valor_investido, data, observacoes, user_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`,
-        [tipo, nome, quantidade, descricao, data, user_id]
-    )
-    return result.rows[0]
-}
+        [ativo, descricao, quantidade, valor_investido, data, observacoes, user_id]
+    );
+    return result.rows[0];
+};
 
-export const fetchInvestments = async (user_id, mes, ano) => {
-    const result = await pool.query(
-        `SELECT * FROM investments
-     WHERE user_id = $1
-     AND EXTRACT(MONTH FROM data) = $2
-     AND EXTRACT(YEAR FROM data) = $3
-     ORDER BY data DESC`,
-        [user_id, mes, ano]
-    )
-    return result.rows
-}
+export const fetchInvestmentsFiltered = async ({ user_id, startDate, endDate, asset }) => {
+    const params = [user_id, startDate, endDate];
+    let query = `
+    SELECT * FROM investments
+    WHERE user_id = $1
+    AND data BETWEEN $2 AND $3
+  `;
 
-export const editInvestment = async (id, { tipo, nome, quantidade, descricao, data }, user_id) => {
-    const result = await pool.query(
-        `UPDATE investments SET
-      tipo = $1,
-      nome = $2,
-      quantidade = $3,
-      descricao = $4,
-      data = $5
-     WHERE id = $6 AND user_id = $7
-     RETURNING *`,
-        [tipo, nome, quantidade, descricao, data, id, user_id]
-    )
-    return result.rows[0]
-}
+    if (asset && asset !== 'todos') {
+        query += ` AND ativo = $4`;
+        params.push(asset);
+    }
 
-export const removeInvestment = async (id, user_id) => {
-    const result = await pool.query(
-        `DELETE FROM investments WHERE id = $1 AND user_id = $2
-     RETURNING *`,
-        [id, user_id]
-    )
-    return result.rows[0]
-}
+    query += ` ORDER BY data DESC`;
 
-export const fetchInvestmentsByDateRange = async (user_id, startDate, endDate) => {
-    const result = await pool.query(
-        `SELECT * FROM investments
-     WHERE user_id = $1
-     AND data BETWEEN $2 AND $3
-     ORDER BY data DESC`,
-        [user_id, startDate, endDate]
-    )
+    const result = await pool.query(query, params);
+    return result.rows;
+};
 
-    return result.rows
-}
+export const fetchInvestmentStats = async ({ user_id, startDate, endDate, asset }) => {
+    const params = [user_id, startDate, endDate];
+    let query = `
+    SELECT
+      COUNT(*) AS total_simulacoes,
+      SUM(valor_investido) AS total_investido,
+      SUM(quantidade) AS total_quantidade,
+      MAX(data) AS ultima_data
+    FROM investments
+    WHERE user_id = $1
+    AND data BETWEEN $2 AND $3
+  `;
+
+    if (asset && asset !== 'todos') {
+        query += ` AND ativo = $4`;
+        params.push(asset);
+    }
+
+    const result = await pool.query(query, params);
+    return result.rows[0];
+};
