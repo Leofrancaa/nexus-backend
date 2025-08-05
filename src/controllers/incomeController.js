@@ -1,7 +1,6 @@
 import {
     addIncome,
     fetchIncomesByDateRange,
-    fetchIncomesByMonthYear,
     editIncome,
     removeIncome,
     getIncomesStats,
@@ -77,27 +76,6 @@ export const getIncomes = async (req, res) => {
     }
 };
 
-// Buscar receitas por mês/ano
-export const getIncomesByMonth = async (req, res) => {
-    const user_id = req.user.id;
-    const mes = parseInt(req.query.mes);
-    const ano = parseInt(req.query.ano);
-
-    if (!mes || !ano) {
-        return res.status(400).json({
-            error: "Parâmetros 'mes' e 'ano' são obrigatórios.",
-        });
-    }
-
-    try {
-        const result = await fetchIncomesByMonthYear(user_id, mes, ano);
-        res.json(result);
-    } catch (err) {
-        console.error("Erro ao buscar receitas do mês:", err);
-        res.status(500).json({ error: "Erro ao buscar receitas do mês." });
-    }
-};
-
 // Atualizar receita
 export const updateIncome = async (req, res) => {
     const userId = req.user.id;
@@ -139,26 +117,30 @@ export const getIncomeStats = async (req, res) => {
     const user_id = req.user.id;
     const mes = parseInt(req.query.month);
     const ano = parseInt(req.query.year);
-    const categoriaId = req.query.categoryId
-        ? parseInt(req.query.categoryId)
-        : null;
+    const categoriaId = req.query.categoryId ? parseInt(req.query.categoryId) : null;
 
     if (!mes || !ano) {
-        return res
-            .status(400)
-            .json({ error: "Parâmetros 'mes' e 'ano' são obrigatórios." });
+        return res.status(400).json({ error: "Parâmetros 'mes' e 'ano' são obrigatórios." });
     }
 
     try {
-        const stats = await getIncomesStats(user_id, mes, ano, categoriaId);
-        res.json(stats);
+        const atual = await getIncomesStats(user_id, mes, ano, categoriaId);
+
+        const mesAnterior = mes === 1 ? 12 : mes - 1;
+        const anoAnterior = mes === 1 ? ano - 1 : ano;
+
+        const anterior = await getIncomesStats(user_id, mesAnterior, anoAnterior, categoriaId);
+
+        res.json({
+            total: Number(atual.total || 0),
+            anterior: Number(anterior.total || 0),
+        });
     } catch (error) {
         console.error("Erro ao buscar estatísticas de receitas:", error);
-        res
-            .status(500)
-            .json({ error: "Erro ao buscar estatísticas de receitas." });
+        res.status(500).json({ error: "Erro ao buscar estatísticas de receitas." });
     }
 };
+
 
 // Total mensal para sumário
 export const getTotalIncomesMonth = async (req, res) => {
@@ -243,5 +225,18 @@ export const getResumoCategorias = async (req, res) => {
         res
             .status(500)
             .json({ error: "Erro ao buscar resumo de categorias de receitas." });
+    }
+};
+
+import { getIncomesGroupedByMonth } from "../services/incomeService.js";
+
+export const getIncomesByMonth = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const result = await getIncomesGroupedByMonth(userId);
+        res.json(result);
+    } catch (err) {
+        console.error("Erro ao buscar receitas por mês:", err);
+        res.status(500).json({ error: "Erro ao buscar receitas por mês" });
     }
 };

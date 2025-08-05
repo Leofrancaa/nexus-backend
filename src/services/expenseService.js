@@ -428,3 +428,31 @@ export const getDespesasStats = async (user_id, mes, ano, categoriaId) => {
     const result = await pool.query(query, params);
     return result.rows[0];
 };
+
+export const getExpensesGroupedByMonth = async (user_id) => {
+    const result = await pool.query(
+        `SELECT 
+      EXTRACT(MONTH FROM data) AS numero_mes,
+      SUM(quantidade) AS total
+     FROM expenses
+     WHERE user_id = $1
+     GROUP BY numero_mes
+     ORDER BY numero_mes`,
+        [user_id]
+    );
+
+    const meses = [
+        "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+        "Jul", "Ago", "Set", "Out", "Nov", "Dez"
+    ];
+
+    const retorno = meses.map((mes, index) => {
+        const encontrado = result.rows.find(r => Number(r.numero_mes) === index + 1);
+        return {
+            mes,
+            total: encontrado ? Number(encontrado.total) : 0,
+        };
+    });
+
+    return retorno;
+};

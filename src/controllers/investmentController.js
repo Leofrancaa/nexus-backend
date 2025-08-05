@@ -47,48 +47,49 @@ export const getInvestments = async (req, res) => {
 
 export const getInvestmentStats = async (req, res) => {
     const user_id = req.user.id;
-    const { month, year, start_date, end_date, asset } = req.query;
+    const { month, year, asset } = req.query;
 
-    let startDate = start_date;
-    let endDate = end_date;
-
-    if (month && year) {
-        const pad = (n) => String(n).padStart(2, '0');
-        const mes = parseInt(month);
-        const ano = parseInt(year);
-        startDate = `${ano}-${pad(mes)}-01`;
-        endDate = new Date(ano, mes, 0).toISOString().split('T')[0];
+    if (!month || !year) {
+        return res.status(400).json({ error: 'Informe month e year.' });
     }
 
-    if (!startDate || !endDate) {
-        return res.status(400).json({ error: 'Informe start_date e end_date ou month e year.' });
-    }
+    const pad = (n) => String(n).padStart(2, '0');
+    const mes = parseInt(month);
+    const ano = parseInt(year);
+    const startDate = `${ano}-${pad(mes)}-01`;
+    const endDate = new Date(ano, mes, 0).toISOString().split('T')[0];
+
+    const mesAnterior = mes === 1 ? 12 : mes - 1;
+    const anoAnterior = mes === 1 ? ano - 1 : ano;
+    const startAnterior = `${anoAnterior}-${pad(mesAnterior)}-01`;
+    const endAnterior = new Date(anoAnterior, mesAnterior, 0).toISOString().split("T")[0];
 
     try {
-        const stats = await fetchInvestmentStats({ user_id, startDate, endDate, asset });
+        const atualStats = await fetchInvestmentStats({ user_id, startDate, endDate, asset });
+        const anteriorStats = await fetchInvestmentStats({ user_id, startDate: startAnterior, endDate: endAnterior, asset });
 
-        // Pega cotação atual para calcular valor atual
+        // Calcula valor atual da carteira
         let precoAtual = 0;
         if (asset && asset !== 'todos') {
             const quote = await yahooFinance.quote(asset);
             precoAtual = quote?.regularMarketPrice || 0;
         }
 
-        const totalAtual = precoAtual * parseFloat(stats.total_quantidade || 0);
-        const rendimento = totalAtual - parseFloat(stats.total_investido || 0);
-        const rentabilidadeMedia =
-            stats.total_investido > 0
-                ? (rendimento / stats.total_investido) * 100
-                : 0;
+        const totalAtual = precoAtual * parseFloat(atualStats.total_quantidade || 0);
+        const totalAnterior = precoAtual * parseFloat(anteriorStats.total_quantidade || 0);
 
         res.json({
-            totalSimulacoes: Number(stats.total_simulacoes || 0),
-            totalInvestido: Number(stats.total_investido || 0),
+            totalInvestido: Number(atualStats.total_investido || 0),
+            anterior: Number(anteriorStats.total_investido || 0),
             valorAtual: Number(totalAtual.toFixed(2)),
-            rentabilidadeMedia: Number(rentabilidadeMedia.toFixed(2)),
+            rentabilidadeMedia:
+                atualStats.total_investido > 0
+                    ? Number((((totalAtual - atualStats.total_investido) / atualStats.total_investido) * 100).toFixed(2))
+                    : 0,
         });
     } catch (err) {
         console.error('Erro ao calcular estatísticas de investimentos:', err);
         res.status(500).json({ error: 'Erro ao calcular estatísticas.' });
     }
 };
+

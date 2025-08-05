@@ -44,24 +44,6 @@ export const getExpenses = async (req, res) => {
     }
 };
 
-// ✅ Buscar despesas do mês atual (novo)
-export const getExpensesByMonth = async (req, res) => {
-    const user_id = req.user.id;
-    const mes = parseInt(req.query.mes);
-    const ano = parseInt(req.query.ano);
-
-    if (!mes || !ano) {
-        return res.status(400).json({ error: "Parâmetros 'mes' e 'ano' são obrigatórios." });
-    }
-
-    try {
-        const result = await fetchExpensesByMonthYear(user_id, mes, ano);
-        res.json(result); // ✅ retorna array direto
-    } catch (err) {
-        console.error("Erro ao buscar despesas do mês:", err);
-        res.status(500).json({ error: "Erro ao buscar despesas." });
-    }
-};
 
 // Atualizar despesa
 export const updateExpense = async (req, res) => {
@@ -151,7 +133,6 @@ export const getTotalExpensesMonth = async (req, res) => {
     }
 };
 
-
 export const getExpenseStats = async (req, res) => {
     const user_id = req.user.id;
     const mes = parseInt(req.query.month);
@@ -163,13 +144,23 @@ export const getExpenseStats = async (req, res) => {
     }
 
     try {
-        const stats = await getDespesasStats(user_id, mes, ano, categoriaId);
-        res.json(stats);
+        const atual = await getDespesasStats(user_id, mes, ano, categoriaId);
+
+        const mesAnterior = mes === 1 ? 12 : mes - 1;
+        const anoAnterior = mes === 1 ? ano - 1 : ano;
+
+        const anterior = await getDespesasStats(user_id, mesAnterior, anoAnterior, categoriaId);
+
+        res.json({
+            total: Number(atual.total || 0),
+            anterior: Number(anterior.total || 0),
+        });
     } catch (error) {
-        console.error("Erro ao buscar estatísticas:", error);
+        console.error("Erro ao buscar estatísticas de despesas:", error);
         res.status(500).json({ error: "Erro ao buscar estatísticas de despesas." });
     }
 };
+
 
 export const getResumoCategorias = async (req, res) => {
     const { mes, ano } = req.query;
@@ -208,4 +199,17 @@ export const getResumoCategorias = async (req, res) => {
     }));
 
     res.json(dados);
+};
+
+import { getExpensesGroupedByMonth } from "../services/expenseService.js";
+
+export const getExpensesByMonth = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const result = await getExpensesGroupedByMonth(userId);
+        res.json(result);
+    } catch (err) {
+        console.error("Erro ao buscar despesas por mês:", err);
+        res.status(500).json({ error: "Erro ao buscar despesas por mês" });
+    }
 };
