@@ -13,37 +13,57 @@ export const addExpense = async (expenseData) => {
         user_id,
         card_id,
         category_id,
-        observacoes, // ✅ novo campo
+        observacoes,
     } = expenseData;
 
-    const baseDate = data
-        ? new Date(`${data}T00:00:00`)
-        : new Date();
+    const baseDate = data ? new Date(`${data}T00:00:00`) : new Date();
+    const formattedBaseDate = baseDate.toISOString().split("T")[0];
 
-    const formattedBaseDate = baseDate.toISOString().split('T')[0];
-
-    if (metodo_pagamento === 'cartao de credito' && card_id) {
+    // ✅ Se for cartão de crédito com ID válido
+    if (
+        metodo_pagamento?.toLowerCase() === "cartao de credito" &&
+        card_id &&
+        !isNaN(Number(card_id))
+    ) {
         const cardResult = await pool.query(
-            `SELECT limite_disponivel FROM cards WHERE id = $1`,
+            `SELECT limite_disponivel, dia_vencimento FROM cards WHERE id = $1`,
             [card_id]
         );
 
         if (cardResult.rows.length === 0) {
-            throw new Error('Cartão não encontrado.');
+            throw new Error("Cartão não encontrado.");
         }
 
-        const limiteDisponivel = parseFloat(cardResult.rows[0].limite_disponivel);
+        const { limite_disponivel, dia_vencimento } = cardResult.rows[0];
 
-        if (quantidade > limiteDisponivel) {
+        const dataDespesa = new Date(`${data}T00:00:00`);
+        const ano = dataDespesa.getFullYear();
+        const mes = dataDespesa.getMonth();
+
+        const fechamentoAtual = new Date(ano, mes, dia_vencimento);
+
+        if (dataDespesa >= fechamentoAtual) {
             throw {
                 status: 400,
-                message: `Valor da despesa (R$${quantidade}) excede o limite disponível do cartão (R$${limiteDisponivel}).`,
+                message: `A despesa informada pertence ao próximo ciclo do cartão. Só é permitido cadastrar despesas até o dia ${dia_vencimento - 1}.`,
+            };
+        }
+
+        if (quantidade > limite_disponivel) {
+            throw {
+                status: 400,
+                message: `Valor da despesa (R$${quantidade}) excede o limite disponível do cartão (R$${limite_disponivel}).`,
             };
         }
     }
 
+
     // 🔁 Parcelada
-    if (metodo_pagamento === 'cartao de credito' && parcelas > 1 && card_id) {
+    if (
+        metodo_pagamento?.toLowerCase() === "cartao de credito" &&
+        parcelas > 1 &&
+        card_id
+    ) {
         const valorParcela = quantidade / parcelas;
 
         for (let i = 0; i < parcelas; i++) {
@@ -106,7 +126,11 @@ export const addExpense = async (expenseData) => {
 
     const baseExpense = result.rows[0];
 
-    if (metodo_pagamento === 'cartao de credito' && card_id) {
+    // Atualiza limite se for cartão
+    if (
+        metodo_pagamento?.toLowerCase() === "cartao de credito" &&
+        card_id
+    ) {
         await pool.query(
             `UPDATE cards SET limite_disponivel = limite_disponivel - $1 WHERE id = $2`,
             [quantidade, card_id]
@@ -116,15 +140,13 @@ export const addExpense = async (expenseData) => {
     // 🔁 Despesa fixa replicada até dezembro
     if (fixo) {
         const diaOriginal = baseDate.getDate();
-        const mesOriginal = baseDate.getMonth(); // 0-11
+        const mesOriginal = baseDate.getMonth();
         const ano = baseDate.getFullYear();
-
         const diasNoMesOriginal = new Date(ano, mesOriginal + 1, 0).getDate();
         const ehUltimoDiaMes = diaOriginal === diasNoMesOriginal;
 
         for (let mes = mesOriginal + 1; mes <= 11; mes++) {
             const diasNoMesAlvo = new Date(ano, mes + 1, 0).getDate();
-
             const diaParaInserir = ehUltimoDiaMes
                 ? diasNoMesAlvo
                 : diaOriginal > diasNoMesAlvo
@@ -133,7 +155,9 @@ export const addExpense = async (expenseData) => {
 
             if (!diaParaInserir) continue;
 
-            const data = `${ano}-${String(mes + 1).padStart(2, "0")}-${String(diaParaInserir).padStart(2, "0")}`;
+            const data = `${ano}-${String(mes + 1).padStart(2, "0")}-${String(
+                diaParaInserir
+            ).padStart(2, "0")}`;
 
             await pool.query(
                 `INSERT INTO expenses (
@@ -159,6 +183,7 @@ export const addExpense = async (expenseData) => {
 
     return baseExpense;
 };
+
 
 
 export const fetchExpensesByMonthYear = async (userId, mes, ano) => {

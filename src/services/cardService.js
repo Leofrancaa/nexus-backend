@@ -73,3 +73,41 @@ export const getGastoTotalDoCartao = async (card_id, user_id) => {
     );
     return Number(result.rows[0].total);
 };
+
+export const hasCurrentMonthExpenses = async (card_id, user_id) => {
+    const result = await pool.query(
+        `SELECT COUNT(*) FROM expenses
+         WHERE card_id = $1 AND user_id = $2
+         AND EXTRACT(MONTH FROM data) = EXTRACT(MONTH FROM CURRENT_DATE)
+         AND EXTRACT(YEAR FROM data) = EXTRACT(YEAR FROM CURRENT_DATE)`,
+        [card_id, user_id]
+    );
+    return Number(result.rows[0].count) > 0;
+};
+
+export const hasPastExpenses = async (card_id, user_id) => {
+    const result = await pool.query(
+        `SELECT COUNT(*) FROM expenses
+         WHERE card_id = $1 AND user_id = $2
+         AND (EXTRACT(MONTH FROM data) != EXTRACT(MONTH FROM CURRENT_DATE)
+              OR EXTRACT(YEAR FROM data) != EXTRACT(YEAR FROM CURRENT_DATE))`,
+        [card_id, user_id]
+    );
+    return Number(result.rows[0].count) > 0;
+};
+
+export const deleteCardAndExpenses = async (card_id, user_id) => {
+    // Exclui todas as despesas vinculadas ao cartão
+    await pool.query(
+        `DELETE FROM expenses WHERE card_id = $1 AND user_id = $2`,
+        [card_id, user_id]
+    );
+
+    // Exclui o cartão
+    const result = await pool.query(
+        `DELETE FROM cards WHERE id = $1 AND user_id = $2 RETURNING *`,
+        [card_id, user_id]
+    );
+
+    return result.rows[0];
+};

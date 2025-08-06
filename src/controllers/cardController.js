@@ -4,6 +4,9 @@ import {
     editCard,
     removeCard,
     getGastoTotalDoCartao,
+    hasCurrentMonthExpenses,
+    hasPastExpenses,
+    deleteCardAndExpenses
 } from "../services/cardService.js";
 
 export const createCard = async (req, res) => {
@@ -94,19 +97,40 @@ export const updateCard = async (req, res) => {
     }
 };
 
+
 export const deleteCard = async (req, res) => {
     const user_id = req.user.id;
     const card_id = req.params.id;
 
     try {
-        const deleted = await removeCard(card_id, user_id);
-        if (!deleted)
-            return res.status(404).json({
-                error: "Cartão não encontrado ou não pertence ao usuário.",
+        const temDespesaAtual = await hasCurrentMonthExpenses(card_id, user_id);
+        const temDespesaPassada = await hasPastExpenses(card_id, user_id);
+
+        if (temDespesaAtual) {
+            return res.status(400).json({
+                error: "Este cartão possui despesas vinculadas no mês atual e não pode ser excluído."
             });
-        res.json({ message: "Cartão removido com sucesso." });
+        }
+
+        if (temDespesaPassada) {
+            const deleted = await deleteCardAndExpenses(card_id, user_id);
+            if (!deleted) {
+                return res.status(404).json({ error: "Cartão não encontrado." });
+            }
+
+            return res.json({
+                message: "Cartão e todas as despesas anteriores vinculadas a ele foram excluídos com sucesso."
+            });
+        }
+
+        const deleted = await removeCard(card_id, user_id);
+        if (!deleted) {
+            return res.status(404).json({ error: "Cartão não encontrado." });
+        }
+
+        return res.json({ message: "Cartão removido com sucesso." });
     } catch (err) {
         console.error("Erro ao excluir cartão:", err);
-        res.status(500).json({ error: "Erro ao excluir cartão." });
+        return res.status(500).json({ error: "Erro ao excluir cartão." });
     }
 };

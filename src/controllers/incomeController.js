@@ -133,8 +133,12 @@ export const getIncomeStats = async (req, res) => {
 
         res.json({
             total: Number(atual.total || 0),
+            fixas: Number(atual.fixas || 0),
+            transacoes: Number(atual.transacoes || 0),
+            media: Number(atual.media || 0),
             anterior: Number(anterior.total || 0),
         });
+
     } catch (error) {
         console.error("Erro ao buscar estatísticas de receitas:", error);
         res.status(500).json({ error: "Erro ao buscar estatísticas de receitas." });
