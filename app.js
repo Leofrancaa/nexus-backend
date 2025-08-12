@@ -25,11 +25,13 @@ const app = express()
 
 const corsOptions = {
     origin: [
-        "http://localhost:3000",
-        "http://10.88.80.40:3000" // ✅ adiciona o IP
+        "http://localhost:3000",       // local dev
+        "http://10.88.80.40:3000",     // teste LAN
+        "https://nexus-tpz3.onrender.com" // front em produção
     ],
-    credentials: true,
+    credentials: true, // permite cookies/autenticação
 };
+
 
 
 app.use(cors(corsOptions));
