@@ -24,9 +24,13 @@ dotenv.config()
 const app = express()
 
 const corsOptions = {
-    origin: "http://localhost:3000", // ✅ origem exata
-    credentials: true,               // ✅ permite envio de cookies
+    origin: [
+        "http://localhost:3000",
+        "http://10.88.80.40:3000" // ✅ adiciona o IP
+    ],
+    credentials: true,
 };
+
 
 app.use(cors(corsOptions));
 app.use(express.json())
