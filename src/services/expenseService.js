@@ -1,6 +1,52 @@
 import { pool } from '../database/index.js';
 import { saveExpenseHistory } from '../utils/finance/saveExpenseHistory.js';
 
+/* ======================== helpers ======================== */
+function normalize(str = "") {
+    return String(str)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+}
+
+function addMonthsSafe(date, n) {
+    const d = new Date(date);
+    const day = d.getDate();
+    d.setMonth(d.getMonth() + n);
+    if (d.getDate() < day) d.setDate(0);
+    return d;
+}
+
+/**
+ * Calcula a competência da fatura da compra com base na data da compra,
+ * dia de vencimento e quantidade de dias antes do vencimento que a fatura fecha.
+ * Ex.: vence dia 15, fecha 10 dias antes => fecha dia 5.
+ */
+function computeCompetencia({ purchaseDate, dueDay, closeDaysBefore }) {
+    const year = purchaseDate.getFullYear();
+    const month = purchaseDate.getMonth();
+
+    const thisMonthDue = new Date(year, month, Math.min(Number(dueDay), 28));
+    const nextDue =
+        purchaseDate <= thisMonthDue
+            ? thisMonthDue
+            : new Date(year, month + 1, Math.min(Number(dueDay), 28));
+
+    const closeDate = new Date(nextDue);
+    closeDate.setDate(closeDate.getDate() - Number(closeDaysBefore));
+
+    // Se a compra foi em/apos o fechamento, cai para a competência do "nextDue".
+    // Se foi antes do fechamento, cai na competência anterior.
+    const competenciaDate = purchaseDate >= closeDate ? nextDue : addMonthsSafe(nextDue, -1);
+
+    return {
+        competencia_mes: competenciaDate.getMonth() + 1,
+        competencia_ano: competenciaDate.getFullYear(),
+    };
+}
+/* ====================== fim helpers ====================== */
+
 export const addExpense = async (expenseData) => {
     const {
         metodo_pagamento,
@@ -19,90 +65,154 @@ export const addExpense = async (expenseData) => {
     const baseDate = data ? new Date(`${data}T00:00:00`) : new Date();
     const formattedBaseDate = baseDate.toISOString().split("T")[0];
 
-    // ✅ Se for cartão de crédito com ID válido
-    if (
-        metodo_pagamento?.toLowerCase() === "cartao de credito" &&
-        card_id &&
-        !isNaN(Number(card_id))
-    ) {
+    const metodoNorm = normalize(metodo_pagamento);
+    const isCreditCard = metodoNorm.includes("credito") && card_id && !isNaN(Number(card_id));
+
+    /* ==================== CARTÃO DE CRÉDITO ==================== */
+    if (isCreditCard) {
         const cardResult = await pool.query(
-            `SELECT limite_disponivel, dia_vencimento FROM cards WHERE id = $1`,
+            `SELECT limite_disponivel, dia_vencimento, dias_fechamento_antes
+         FROM cards
+        WHERE id = $1`,
             [card_id]
         );
-
         if (cardResult.rows.length === 0) {
             throw new Error("Cartão não encontrado.");
         }
 
-        const { limite_disponivel, dia_vencimento } = cardResult.rows[0];
+        const { limite_disponivel, dia_vencimento, dias_fechamento_antes } = cardResult.rows[0];
 
-        const dataDespesa = new Date(`${data}T00:00:00`);
-        const ano = dataDespesa.getFullYear();
-        const mes = dataDespesa.getMonth();
+        const dataDespesa = new Date(`${(data ?? formattedBaseDate)}T00:00:00`);
 
-        const fechamentoAtual = new Date(ano, mes, dia_vencimento);
+        // ✅ calcula competência com base NA DATA DA COMPRA
+        const { competencia_mes, competencia_ano } = computeCompetencia({
+            purchaseDate: dataDespesa,
+            dueDay: Number(dia_vencimento),
+            closeDaysBefore: Number(dias_fechamento_antes ?? 10),
+        });
 
-        if (dataDespesa >= fechamentoAtual) {
+        // 🔒 impedir lançamento em competência já paga
+        const pago = await pool.query(
+            `SELECT 1 FROM card_invoices_payments
+        WHERE user_id = $1 AND card_id = $2
+          AND competencia_mes = $3 AND competencia_ano = $4`,
+            [user_id, card_id, competencia_mes, competencia_ano]
+        );
+        if (pago.rowCount > 0) {
             throw {
                 status: 400,
-                message: `A despesa informada pertence ao próximo ciclo do cartão. Só é permitido cadastrar despesas até o dia ${dia_vencimento - 1}.`,
+                message:
+                    "Esta fatura já foi paga. Não é possível lançar despesas nessa competência.",
             };
         }
 
-        if (quantidade > limite_disponivel) {
+        // 🔒 valida limite no momento do lançamento
+        if (Number(quantidade) > Number(limite_disponivel)) {
             throw {
                 status: 400,
                 message: `Valor da despesa (R$${quantidade}) excede o limite disponível do cartão (R$${limite_disponivel}).`,
             };
         }
-    }
 
+        // -------- PARCELADA NO CARTÃO --------
+        if (parcelas > 1) {
+            const valorParcela = Number(quantidade) / Number(parcelas);
 
-    // 🔁 Parcelada
-    if (
-        metodo_pagamento?.toLowerCase() === "cartao de credito" &&
-        parcelas > 1 &&
-        card_id
-    ) {
-        const valorParcela = quantidade / parcelas;
+            for (let i = 0; i < parcelas; i++) {
+                const parcelaPurchaseDate = addMonthsSafe(dataDespesa, i);
+                const comp = computeCompetencia({
+                    purchaseDate: parcelaPurchaseDate,
+                    dueDay: Number(dia_vencimento),
+                    closeDaysBefore: Number(dias_fechamento_antes ?? 10),
+                });
 
-        for (let i = 0; i < parcelas; i++) {
-            const parcelaDate = new Date(baseDate);
-            parcelaDate.setMonth(parcelaDate.getMonth() + i);
+                // impedir parcela em competência já paga
+                const pagoParcela = await pool.query(
+                    `SELECT 1 FROM card_invoices_payments
+            WHERE user_id = $1 AND card_id = $2
+              AND competencia_mes = $3 AND competencia_ano = $4`,
+                    [user_id, card_id, comp.competencia_mes, comp.competencia_ano]
+                );
+                if (pagoParcela.rowCount > 0) {
+                    throw {
+                        status: 400,
+                        message: `A competência ${String(comp.competencia_mes).padStart(2, "0")}/${comp.competencia_ano} já foi paga. Ajuste a data/parcelas.`,
+                    };
+                }
 
+                await pool.query(
+                    `INSERT INTO expenses (
+            metodo_pagamento, tipo, quantidade, fixo, data,
+            parcelas, frequencia, user_id, card_id, category_id, observacoes,
+            competencia_mes, competencia_ano
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+                    [
+                        metodo_pagamento,
+                        `${tipo} (${i + 1}/${parcelas})`,
+                        valorParcela,
+                        false,
+                        parcelaPurchaseDate.toISOString().split("T")[0],
+                        parcelas,
+                        frequencia,
+                        user_id,
+                        card_id,
+                        category_id,
+                        observacoes || null,
+                        comp.competencia_mes,
+                        comp.competencia_ano,
+                    ]
+                );
+            }
+
+            // reduz o limite pelo total da compra
             await pool.query(
-                `INSERT INTO expenses (
-          metodo_pagamento, tipo, quantidade, fixo, data,
-          parcelas, frequencia, user_id, card_id, category_id, observacoes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-                [
-                    metodo_pagamento,
-                    `${tipo} (${i + 1}/${parcelas})`,
-                    valorParcela,
-                    false,
-                    parcelaDate.toISOString().split("T")[0],
-                    parcelas,
-                    frequencia,
-                    user_id,
-                    card_id,
-                    category_id,
-                    observacoes || null,
-                ]
+                `UPDATE cards SET limite_disponivel = limite_disponivel - $1 WHERE id = $2`,
+                [quantidade, card_id]
             );
+
+            return {
+                message: `Despesa parcelada adicionada (${parcelas}x de R$${(
+                    Number(quantidade) / Number(parcelas)
+                ).toFixed(2)})`,
+                valor_total: Number(quantidade),
+            };
         }
+
+        // -------- À VISTA NO CARTÃO --------
+        const inserted = await pool.query(
+            `INSERT INTO expenses (
+        metodo_pagamento, tipo, quantidade, fixo, data,
+        parcelas, frequencia, user_id, card_id, category_id, observacoes,
+        competencia_mes, competencia_ano
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      RETURNING *`,
+            [
+                metodo_pagamento,
+                tipo,
+                quantidade,
+                false,
+                (data ?? formattedBaseDate),
+                null,
+                frequencia,
+                user_id,
+                card_id,
+                category_id,
+                observacoes || null,
+                competencia_mes,
+                competencia_ano,
+            ]
+        );
 
         await pool.query(
             `UPDATE cards SET limite_disponivel = limite_disponivel - $1 WHERE id = $2`,
             [quantidade, card_id]
         );
 
-        return {
-            message: `Despesa parcelada adicionada (${parcelas}x de R$${valorParcela.toFixed(2)})`,
-            valor_total: quantidade,
-        };
+        return inserted.rows[0];
     }
+    /* ================== FIM CARTÃO DE CRÉDITO ================== */
 
-    // 🔁 Despesa comum
+    /* ===================== DESPESA COMUM ===================== */
     const result = await pool.query(
         `INSERT INTO expenses (
       metodo_pagamento, tipo, quantidade, fixo, data,
@@ -126,17 +236,6 @@ export const addExpense = async (expenseData) => {
 
     const baseExpense = result.rows[0];
 
-    // Atualiza limite se for cartão
-    if (
-        metodo_pagamento?.toLowerCase() === "cartao de credito" &&
-        card_id
-    ) {
-        await pool.query(
-            `UPDATE cards SET limite_disponivel = limite_disponivel - $1 WHERE id = $2`,
-            [quantidade, card_id]
-        );
-    }
-
     // 🔁 Despesa fixa replicada até dezembro
     if (fixo) {
         const diaOriginal = baseDate.getDate();
@@ -155,7 +254,7 @@ export const addExpense = async (expenseData) => {
 
             if (!diaParaInserir) continue;
 
-            const data = `${ano}-${String(mes + 1).padStart(2, "0")}-${String(
+            const dataRep = `${ano}-${String(mes + 1).padStart(2, "0")}-${String(
                 diaParaInserir
             ).padStart(2, "0")}`;
 
@@ -169,7 +268,7 @@ export const addExpense = async (expenseData) => {
                     tipo,
                     quantidade,
                     true,
-                    data,
+                    dataRep,
                     parcelas,
                     frequencia,
                     user_id,
@@ -183,8 +282,6 @@ export const addExpense = async (expenseData) => {
 
     return baseExpense;
 };
-
-
 
 export const fetchExpensesByMonthYear = async (userId, mes, ano) => {
     const result = await pool.query(
@@ -204,20 +301,19 @@ export const fetchExpensesByMonthYear = async (userId, mes, ano) => {
     return result.rows;
 };
 
-
 export const fetchExpensesByDateRange = async (user_id, startDate, endDate) => {
     const result = await pool.query(
         `SELECT 
-  e.*, 
-  c.id AS category_id,
-  c.nome AS categoria_nome, 
-  c.cor AS cor_categoria
-FROM expenses e
-LEFT JOIN categories c ON e.category_id = c.id
-WHERE e.user_id = $1
-  AND e.data BETWEEN $2 AND $3
-ORDER BY e.data DESC
-`,
+      e.*, 
+      c.id AS category_id,
+      c.nome AS categoria_nome, 
+      c.cor AS cor_categoria
+     FROM expenses e
+     LEFT JOIN categories c ON e.category_id = c.id
+     WHERE e.user_id = $1
+       AND e.data BETWEEN $2 AND $3
+     ORDER BY e.data DESC
+    `,
         [user_id, startDate, endDate]
     );
 
@@ -234,8 +330,9 @@ export const editExpense = async (id, data, user_id) => {
 
     const original = current.rows[0];
 
-    // 🔒 Bloqueio de edição para despesas no cartão
-    if (original.metodo_pagamento === "cartao de credito") {
+    // 🔒 Bloqueio de edição para despesas no cartão de crédito
+    const metodoOrigNorm = normalize(original.metodo_pagamento);
+    if (metodoOrigNorm.includes("credito")) {
         throw {
             status: 400,
             message: "Despesas no cartão de crédito não podem ser editadas.",
@@ -285,13 +382,13 @@ export const editExpense = async (id, data, user_id) => {
     if (original.fixo) {
         const result = await pool.query(
             `UPDATE expenses
-       SET tipo = $1,
-           quantidade = $2,
-           metodo_pagamento = $3,
-           parcelas = $4,
-           frequencia = $5,
-           card_id = $6,
-           category_id = $7
+         SET tipo = $1,
+             quantidade = $2,
+             metodo_pagamento = $3,
+             parcelas = $4,
+             frequencia = $5,
+             card_id = $6,
+             category_id = $7
        WHERE user_id = $8
          AND tipo = $9
          AND fixo = true
@@ -318,6 +415,7 @@ export const editExpense = async (id, data, user_id) => {
 
     return updatedMain.rows[0];
 };
+
 export const removeExpense = async (id, user_id) => {
     const result = await pool.query(
         `SELECT * FROM expenses WHERE id = $1 AND user_id = $2`,
@@ -337,11 +435,13 @@ export const removeExpense = async (id, user_id) => {
         parcelas,
     } = expense;
 
+    const metodoNorm = normalize(metodo_pagamento);
+
     // 🔒 Se for parcelada no cartão de crédito, exclui todas da mesma série
-    if (metodo_pagamento === "cartao de credito" && parcelas > 1 && card_id) {
+    if (metodoNorm.includes("credito") && parcelas > 1 && card_id) {
         const parcelasToRemove = await pool.query(
             `DELETE FROM expenses
-       WHERE user_id = $1 AND tipo LIKE $2 AND card_id = $3 AND parcelas = $4
+         WHERE user_id = $1 AND tipo LIKE $2 AND card_id = $3 AND parcelas = $4
        RETURNING *`,
             [user_id, `${tipo.split(" (")[0]}%`, card_id, parcelas]
         );
@@ -350,7 +450,7 @@ export const removeExpense = async (id, user_id) => {
 
         await pool.query(
             `UPDATE cards SET limite_disponivel = limite_disponivel + $1
-       WHERE id = $2 AND user_id = $3`,
+         WHERE id = $2 AND user_id = $3`,
             [total, card_id, user_id]
         );
 
@@ -365,12 +465,12 @@ export const removeExpense = async (id, user_id) => {
         );
 
         // Se for cartão de crédito, devolver total removido
-        if (metodo_pagamento === "cartao de credito" && card_id) {
+        if (metodoNorm.includes("credito") && card_id) {
             const total = removidas.rows.reduce((sum, e) => sum + Number(e.quantidade), 0);
 
             await pool.query(
                 `UPDATE cards SET limite_disponivel = limite_disponivel + $1
-         WHERE id = $2 AND user_id = $3`,
+           WHERE id = $2 AND user_id = $3`,
                 [total, card_id, user_id]
             );
         }
@@ -386,14 +486,10 @@ export const removeExpense = async (id, user_id) => {
 
     const item = deleted.rows[0];
 
-    if (
-        item &&
-        item.metodo_pagamento === "cartao de credito" &&
-        item.card_id
-    ) {
+    if (item && normalize(item.metodo_pagamento).includes("credito") && item.card_id) {
         await pool.query(
             `UPDATE cards SET limite_disponivel = limite_disponivel + $1
-       WHERE id = $2 AND user_id = $3`,
+         WHERE id = $2 AND user_id = $3`,
             [item.quantidade, item.card_id, user_id]
         );
     }
@@ -401,15 +497,14 @@ export const removeExpense = async (id, user_id) => {
     return item;
 };
 
-
 export const getTotalPorCategoria = async (user_id, category_id, mes, ano) => {
     const result = await pool.query(
         `SELECT COALESCE(SUM(quantidade), 0) AS total
-     FROM expenses
-     WHERE user_id = $1
-       AND category_id = $2
-       AND EXTRACT(MONTH FROM data) = $3
-       AND EXTRACT(YEAR FROM data) = $4`,
+       FROM expenses
+      WHERE user_id = $1
+        AND category_id = $2
+        AND EXTRACT(MONTH FROM data) = $3
+        AND EXTRACT(YEAR FROM data) = $4`,
         [user_id, category_id, mes, ano]
     );
 
@@ -419,16 +514,15 @@ export const getTotalPorCategoria = async (user_id, category_id, mes, ano) => {
 export const getTotalDespesasDoMes = async (user_id, mes, ano) => {
     const result = await pool.query(
         `SELECT COALESCE(SUM(quantidade), 0) AS total
-         FROM expenses
-         WHERE user_id = $1
-         AND EXTRACT(MONTH FROM data) = $2
-         AND EXTRACT(YEAR FROM data) = $3`,
+       FROM expenses
+      WHERE user_id = $1
+        AND EXTRACT(MONTH FROM data) = $2
+        AND EXTRACT(YEAR FROM data) = $3`,
         [user_id, mes, ano]
     );
 
     return parseFloat(result.rows[0].total);
 };
-
 
 export const getDespesasStats = async (user_id, mes, ano, categoriaId) => {
     let query = `
@@ -457,12 +551,12 @@ export const getDespesasStats = async (user_id, mes, ano, categoriaId) => {
 export const getExpensesGroupedByMonth = async (user_id) => {
     const result = await pool.query(
         `SELECT 
-      EXTRACT(MONTH FROM data) AS numero_mes,
-      SUM(quantidade) AS total
-     FROM expenses
-     WHERE user_id = $1
-     GROUP BY numero_mes
-     ORDER BY numero_mes`,
+        EXTRACT(MONTH FROM data) AS numero_mes,
+        SUM(quantidade) AS total
+       FROM expenses
+      WHERE user_id = $1
+      GROUP BY numero_mes
+      ORDER BY numero_mes`,
         [user_id]
     );
 

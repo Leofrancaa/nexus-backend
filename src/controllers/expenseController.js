@@ -9,6 +9,8 @@ import {
     getDespesasStats
 } from '../services/expenseService.js';
 
+import { getExpensesGroupedByMonth } from "../services/expenseService.js";
+
 import { pool } from '../database/index.js';
 
 // Criar despesa
@@ -44,6 +46,24 @@ export const getExpenses = async (req, res) => {
     }
 };
 
+// Buscar despesas por mês/ano
+export const getExpensesByMonthYear = async (req, res) => {
+    const userId = req.user.id;
+    const mes = parseInt(req.query.mes);
+    const ano = parseInt(req.query.ano);
+
+    if (!mes || !ano) {
+        return res.status(400).json({ error: "Parâmetros 'mes' e 'ano' são obrigatórios." });
+    }
+
+    try {
+        const result = await fetchExpensesByMonthYear(userId, mes, ano);
+        res.json(result);
+    } catch (err) {
+        console.error('Erro ao buscar despesas por mês/ano:', err);
+        res.status(500).json({ error: 'Erro ao buscar despesas por mês/ano.' });
+    }
+};
 
 // Atualizar despesa
 export const updateExpense = async (req, res) => {
@@ -58,6 +78,9 @@ export const updateExpense = async (req, res) => {
         res.json(updated);
     } catch (err) {
         console.error('Erro ao atualizar despesa:', err);
+        if (err.status && err.message) {
+            return res.status(err.status).json({ error: err.message });
+        }
         res.status(500).json({ error: 'Erro ao atualizar despesa.' });
     }
 };
@@ -87,8 +110,8 @@ export const getExpenseHistory = async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT * FROM expense_history 
-       WHERE expense_id = $1 AND user_id = $2
-       ORDER BY data_alteracao DESC`,
+             WHERE expense_id = $1 AND user_id = $2
+             ORDER BY data_alteracao DESC`,
             [expenseId, user_id]
         );
         res.json(result.rows);
@@ -165,32 +188,29 @@ export const getExpenseStats = async (req, res) => {
     }
 };
 
-
 export const getResumoCategorias = async (req, res) => {
     const { mes, ano } = req.query;
     const user_id = req.user.id;
 
-
     const { rows } = await pool.query(
         `
-  SELECT 
-    c_pai.id,
-    c_pai.nome,
-    c_pai.cor,
-    COUNT(e.id) AS quantidade,
-    SUM(e.quantidade) AS total
-  FROM categories c_pai
-  LEFT JOIN categories c_sub ON c_sub.parent_id = c_pai.id
-  LEFT JOIN expenses e ON e.category_id = c_pai.id OR e.category_id = c_sub.id
-  WHERE c_pai.user_id = $1
-    AND c_pai.parent_id IS NULL
-    AND EXTRACT(MONTH FROM e.data) = $2 
-    AND EXTRACT(YEAR FROM e.data) = $3
-  GROUP BY c_pai.id, c_pai.nome, c_pai.cor
-  `,
+        SELECT 
+          c_pai.id,
+          c_pai.nome,
+          c_pai.cor,
+          COUNT(e.id) AS quantidade,
+          SUM(e.quantidade) AS total
+        FROM categories c_pai
+        LEFT JOIN categories c_sub ON c_sub.parent_id = c_pai.id
+        LEFT JOIN expenses e ON e.category_id = c_pai.id OR e.category_id = c_sub.id
+        WHERE c_pai.user_id = $1
+          AND c_pai.parent_id IS NULL
+          AND EXTRACT(MONTH FROM e.data) = $2 
+          AND EXTRACT(YEAR FROM e.data) = $3
+        GROUP BY c_pai.id, c_pai.nome, c_pai.cor
+        `,
         [user_id, mes, ano]
     );
-
 
     const totalGeral = rows.reduce((acc, r) => acc + Number(r.total), 0);
 
@@ -199,13 +219,12 @@ export const getResumoCategorias = async (req, res) => {
         cor: r.cor,
         quantidade: Number(r.quantidade),
         total: Number(r.total),
-        percentual: (Number(r.total) / totalGeral) * 100,
+        percentual: (Number(r.total) / (totalGeral || 1)) * 100,
     }));
 
     res.json(dados);
 };
 
-import { getExpensesGroupedByMonth } from "../services/expenseService.js";
 
 export const getExpensesByMonth = async (req, res) => {
     try {
