@@ -32,7 +32,7 @@ const corsOptions = {
     credentials: true, // permite cookies/autenticação
 };
 
-
+app.set("trust proxy", 1); // para aceitar o cabeçalho X-Forwarded-For em produção
 
 app.use(cors(corsOptions));
 app.use(express.json())
