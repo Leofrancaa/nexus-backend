@@ -1,11 +1,10 @@
-import { Pool } from 'pg'
-import dotenv from 'dotenv'
+import pg from 'pg';
+import dotenv from 'dotenv';
+dotenv.config();
 
-dotenv.config()
+const { Pool } = pg;
 
 export const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false // importante para conexão com Supabase
-    }
-})
+    ssl: { rejectUnauthorized: false }, // força SSL para Supabase
+});
