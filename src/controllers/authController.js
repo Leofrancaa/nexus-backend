@@ -49,15 +49,39 @@ export const loginUser = async (req, res) => {
 
         const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '2h' })
 
+        // 🍪 Configurações de cookie específicas para iOS Safari
         const isProd = process.env.NODE_ENV === 'production'
-        const cookieOptions = isProd
-            ? { httpOnly: true, secure: true, sameSite: 'none', path: '/', maxAge: TOKEN_TTL_MS }
-            : { httpOnly: true, secure: false, sameSite: 'lax', path: '/', maxAge: TOKEN_TTL_MS }
 
+        // iOS Safari é mais rigoroso com cookies
+        const cookieOptions = isProd ? {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none', // Necessário para cross-site em produção
+            path: '/',
+            maxAge: TOKEN_TTL_MS,
+            domain: undefined // Deixar undefined para funcionar com subdomínios
+        } : {
+            httpOnly: true,
+            secure: false, // HTTP em desenvolvimento
+            sameSite: 'lax', // Mais permissivo em desenvolvimento
+            path: '/',
+            maxAge: TOKEN_TTL_MS
+        }
+
+        // 📱 Headers adicionais para PWA/iOS
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+        res.setHeader('Pragma', 'no-cache')
+        res.setHeader('Expires', '0')
+
+        // 🔄 Resposta com cookie E token no body (fallback para iOS)
         res
             .cookie('token', token, cookieOptions)
             .status(200)
-            .json({ message: 'Login realizado com sucesso', user: { id: user.id, nome: user.nome, email: user.email } })
+            .json({
+                message: 'Login realizado com sucesso',
+                user: { id: user.id, nome: user.nome, email: user.email },
+                token: token // 🔑 Enviamos o token também no body para iOS
+            })
     } catch (error) {
         console.error('[loginUser]', error)
         return res.status(500).json({ error: 'Erro ao fazer login.' })
@@ -66,9 +90,26 @@ export const loginUser = async (req, res) => {
 
 export const logoutUser = async (_req, res) => {
     const isProd = process.env.NODE_ENV === 'production'
-    const clearOpts = isProd
-        ? { httpOnly: true, secure: true, sameSite: 'none', path: '/' }
-        : { httpOnly: true, secure: false, sameSite: 'lax', path: '/' }
 
-    res.clearCookie('token', clearOpts).status(200).json({ message: 'Logout realizado com sucesso' })
+    // 🧹 Limpar cookie de forma compatível com iOS
+    const clearOpts = isProd ? {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none',
+        path: '/',
+        domain: undefined
+    } : {
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax',
+        path: '/'
+    }
+
+    res
+        .clearCookie('token', clearOpts)
+        .status(200)
+        .json({ message: 'Logout realizado com sucesso' })
+
+    // 📱 Headers para garantir que o logout funcione no PWA
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
 }
