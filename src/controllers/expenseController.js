@@ -6,10 +6,9 @@ import {
     removeExpense,
     getTotalPorCategoria,
     getTotalDespesasDoMes,
-    getDespesasStats
+    getDespesasStats,
+    getExpensesGroupedByMonth
 } from '../services/expenseService.js';
-
-import { getExpensesGroupedByMonth } from "../services/expenseService.js";
 
 import { pool } from '../database/index.js';
 
@@ -137,7 +136,7 @@ export const getTotalByCategoria = async (req, res) => {
     }
 };
 
-// ✅ Total de despesas do mês (para sumário)
+// Total de despesas do mês (para sumário)
 export const getTotalExpensesMonth = async (req, res) => {
     const user_id = req.user.id;
     const mes = parseInt(req.query.mes);
@@ -156,6 +155,7 @@ export const getTotalExpensesMonth = async (req, res) => {
     }
 };
 
+// Estatísticas de despesas
 export const getExpenseStats = async (req, res) => {
     const user_id = req.user.id;
     const mes = parseInt(req.query.month);
@@ -188,44 +188,50 @@ export const getExpenseStats = async (req, res) => {
     }
 };
 
+// Resumo por categoria
 export const getResumoCategorias = async (req, res) => {
     const { mes, ano } = req.query;
     const user_id = req.user.id;
 
-    const { rows } = await pool.query(
-        `
-        SELECT 
-          c_pai.id,
-          c_pai.nome,
-          c_pai.cor,
-          COUNT(e.id) AS quantidade,
-          SUM(e.quantidade) AS total
-        FROM categories c_pai
-        LEFT JOIN categories c_sub ON c_sub.parent_id = c_pai.id
-        LEFT JOIN expenses e ON e.category_id = c_pai.id OR e.category_id = c_sub.id
-        WHERE c_pai.user_id = $1
-          AND c_pai.parent_id IS NULL
-          AND EXTRACT(MONTH FROM e.data) = $2 
-          AND EXTRACT(YEAR FROM e.data) = $3
-        GROUP BY c_pai.id, c_pai.nome, c_pai.cor
-        `,
-        [user_id, mes, ano]
-    );
+    try {
+        const { rows } = await pool.query(
+            `
+            SELECT 
+              c_pai.id,
+              c_pai.nome,
+              c_pai.cor,
+              COUNT(e.id) AS quantidade,
+              SUM(e.quantidade) AS total
+            FROM categories c_pai
+            LEFT JOIN categories c_sub ON c_sub.parent_id = c_pai.id
+            LEFT JOIN expenses e ON e.category_id = c_pai.id OR e.category_id = c_sub.id
+            WHERE c_pai.user_id = $1
+              AND c_pai.parent_id IS NULL
+              AND EXTRACT(MONTH FROM e.data) = $2 
+              AND EXTRACT(YEAR FROM e.data) = $3
+            GROUP BY c_pai.id, c_pai.nome, c_pai.cor
+            `,
+            [user_id, mes, ano]
+        );
 
-    const totalGeral = rows.reduce((acc, r) => acc + Number(r.total), 0);
+        const totalGeral = rows.reduce((acc, r) => acc + Number(r.total), 0);
 
-    const dados = rows.map((r) => ({
-        nome: r.nome,
-        cor: r.cor,
-        quantidade: Number(r.quantidade),
-        total: Number(r.total),
-        percentual: (Number(r.total) / (totalGeral || 1)) * 100,
-    }));
+        const dados = rows.map((r) => ({
+            nome: r.nome,
+            cor: r.cor,
+            quantidade: Number(r.quantidade),
+            total: Number(r.total),
+            percentual: (Number(r.total) / (totalGeral || 1)) * 100,
+        }));
 
-    res.json(dados);
+        res.json(dados);
+    } catch (err) {
+        console.error("Erro ao buscar resumo de categorias de despesas:", err);
+        res.status(500).json({ error: "Erro ao buscar resumo de categorias de despesas." });
+    }
 };
 
-
+// Buscar despesas agrupadas por mês
 export const getExpensesByMonth = async (req, res) => {
     try {
         const userId = req.user.id;

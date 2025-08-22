@@ -4,7 +4,7 @@ import {
     deleteCardAndExpenses, getSaldoEmAbertoDoCartao
 } from "../services/cardService.js";
 
-/* criar cartão */
+// Criar cartão
 export const createCard = async (req, res) => {
     const user_id = req.user.id;
     const { nome, tipo, numero, cor, limite, dia_vencimento, dias_fechamento_antes } = req.body;
@@ -33,7 +33,7 @@ export const createCard = async (req, res) => {
     }
 };
 
-/* atualizar cartão */
+// Atualizar cartão
 export const updateCard = async (req, res) => {
     const user_id = req.user.id;
     const id = req.params.id;
@@ -50,7 +50,7 @@ export const updateCard = async (req, res) => {
     }
 
     try {
-        // ✅ valida com SALDO EM ABERTO (não com gasto total histórico)
+        // Valida com SALDO EM ABERTO (não com gasto total histórico)
         const saldoEmAberto = await getSaldoEmAbertoDoCartao(id, user_id);
         if (Number(limite) < Number(saldoEmAberto)) {
             return res.status(400).json({
@@ -63,9 +63,11 @@ export const updateCard = async (req, res) => {
             { nome, tipo, numero, cor, limite, dia_vencimento, dias_fechamento_antes },
             user_id
         );
+
         if (!updatedCard) {
             return res.status(404).json({ error: "Cartão não encontrado ou não pertence ao usuário." });
         }
+
         res.json(updatedCard);
     } catch (err) {
         console.error("Erro ao atualizar cartão:", err);
@@ -73,6 +75,7 @@ export const updateCard = async (req, res) => {
     }
 };
 
+// Buscar cartões
 export const getCards = async (req, res) => {
     try {
         const cards = await fetchCards(req.user.id);
@@ -83,6 +86,7 @@ export const getCards = async (req, res) => {
     }
 };
 
+// Deletar cartão
 export const deleteCard = async (req, res) => {
     const user_id = req.user.id;
     const card_id = req.params.id;

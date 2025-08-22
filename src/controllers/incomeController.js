@@ -6,6 +6,7 @@ import {
     getIncomesStats,
     getTotalReceitasDoMes,
     getTotalReceitaPorCategoria,
+    getIncomesGroupedByMonth
 } from "../services/incomeService.js";
 import { pool } from "../database/index.js";
 
@@ -21,7 +22,6 @@ export const createIncome = async (req, res) => {
             return res.status(201).json(created);
         }
 
-        // 🔁 Replicar até dezembro
         // 🔁 Replicar receitas fixas até dezembro
         const originalDate = new Date(created.data);
         const ano = originalDate.getFullYear();
@@ -83,10 +83,11 @@ export const updateIncome = async (req, res) => {
 
     try {
         const updated = await editIncome(incomeId, req.body, userId);
-        if (!updated)
+        if (!updated) {
             return res.status(404).json({
                 error: "Receita não encontrada ou não pertence ao usuário.",
             });
+        }
         res.json(updated);
     } catch (err) {
         console.error("Erro ao atualizar receita:", err);
@@ -101,10 +102,11 @@ export const deleteIncome = async (req, res) => {
 
     try {
         const deleted = await removeIncome(incomeId, userId);
-        if (!deleted)
+        if (!deleted) {
             return res.status(404).json({
                 error: "Receita não encontrada ou não pertence ao usuário.",
             });
+        }
         res.json({ message: "Receita removida com sucesso." });
     } catch (err) {
         console.error("Erro ao excluir receita:", err);
@@ -144,7 +146,6 @@ export const getIncomeStats = async (req, res) => {
         res.status(500).json({ error: "Erro ao buscar estatísticas de receitas." });
     }
 };
-
 
 // Total mensal para sumário
 export const getTotalIncomesMonth = async (req, res) => {
@@ -198,18 +199,18 @@ export const getResumoCategorias = async (req, res) => {
     try {
         const { rows } = await pool.query(
             `
-      SELECT 
-        c.nome,
-        c.cor,
-        COUNT(i.id) as quantidade,
-        SUM(i.quantidade) as total
-      FROM incomes i
-      JOIN categories c ON c.id = i.category_id
-      WHERE i.user_id = $1 
-        AND EXTRACT(MONTH FROM i.data) = $2 
-        AND EXTRACT(YEAR FROM i.data) = $3
-      GROUP BY c.nome, c.cor
-      `,
+            SELECT 
+                c.nome,
+                c.cor,
+                COUNT(i.id) as quantidade,
+                SUM(i.quantidade) as total
+            FROM incomes i
+            JOIN categories c ON c.id = i.category_id
+            WHERE i.user_id = $1 
+                AND EXTRACT(MONTH FROM i.data) = $2 
+                AND EXTRACT(YEAR FROM i.data) = $3
+            GROUP BY c.nome, c.cor
+            `,
             [user_id, mes, ano]
         );
 
@@ -232,8 +233,7 @@ export const getResumoCategorias = async (req, res) => {
     }
 };
 
-import { getIncomesGroupedByMonth } from "../services/incomeService.js";
-
+// Buscar receitas agrupadas por mês
 export const getIncomesByMonth = async (req, res) => {
     try {
         const userId = req.user.id;
