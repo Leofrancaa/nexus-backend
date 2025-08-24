@@ -11,6 +11,7 @@ import {
 import { pool } from "../database/index.js";
 
 // Criar receita
+// Criar receita
 export const createIncome = async (req, res) => {
     const userId = req.user.id;
 
@@ -22,18 +23,23 @@ export const createIncome = async (req, res) => {
             return res.status(201).json(created);
         }
 
-        // 🔁 Replicar receitas fixas até dezembro
+        // 🔁 Replicar receitas fixas até dezembro (CORRIGIDA)
         const originalDate = new Date(created.data);
         const ano = originalDate.getFullYear();
         const diaOriginal = originalDate.getDate();
         const mesOriginal = originalDate.getMonth(); // 0-based
         const replicadas = [];
 
-        for (let m = mesOriginal + 1; m < 12; m++) {
-            const ultimoDiaDoMes = new Date(ano, m + 1, 0).getDate(); // último dia do mês
-            const diaAjustado = Math.min(diaOriginal, ultimoDiaDoMes); // evita dia 31 em meses que não tem
+        // Função melhorada para ajustar datas
+        const ajustarDiaDoMes = (diaOriginal, targetMes, targetAno) => {
+            const ultimoDiaTargetMes = new Date(targetAno, targetMes + 1, 0).getDate();
+            return Math.min(diaOriginal, ultimoDiaTargetMes);
+        };
 
+        for (let m = mesOriginal + 1; m < 12; m++) {
+            const diaAjustado = ajustarDiaDoMes(diaOriginal, m, ano);
             const novaData = new Date(ano, m, diaAjustado);
+
             const copia = {
                 tipo: created.tipo,
                 quantidade: created.quantidade,
@@ -55,6 +61,7 @@ export const createIncome = async (req, res) => {
         res.status(500).json({ error: "Erro ao criar receita." });
     }
 };
+
 
 // Buscar receitas por intervalo
 export const getIncomes = async (req, res) => {

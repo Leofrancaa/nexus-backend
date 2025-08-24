@@ -47,6 +47,11 @@ function computeCompetencia({ purchaseDate, dueDay, closeDaysBefore }) {
 }
 /* ====================== fim helpers ====================== */
 
+// ================================
+// CORREÇÃO 1: DESPESAS FIXAS NO CARTÃO
+// arquivo: src/services/expenseService.js
+// ================================
+
 export const addExpense = async (expenseData) => {
     const {
         metodo_pagamento,
@@ -178,6 +183,106 @@ export const addExpense = async (expenseData) => {
             };
         }
 
+        // -------- DESPESA FIXA NO CARTÃO (CORREÇÃO 1) --------
+        if (fixo) {
+            // Para despesas fixas no cartão, forçar parcelas = 1 (uma parcela por mês)
+            const parcelas_fixa = 1;
+
+            // Inserir a despesa do mês atual
+            const inserted = await pool.query(
+                `INSERT INTO expenses (
+            metodo_pagamento, tipo, quantidade, fixo, data,
+            parcelas, frequencia, user_id, card_id, category_id, observacoes,
+            competencia_mes, competencia_ano
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+          RETURNING *`,
+                [
+                    metodo_pagamento,
+                    tipo,
+                    quantidade,
+                    true, // 🔥 IMPORTANTE: manter fixo = true
+                    formattedBaseDate,
+                    parcelas_fixa,
+                    frequencia,
+                    user_id,
+                    card_id,
+                    category_id,
+                    observacoes || null,
+                    competencia_mes,
+                    competencia_ano,
+                ]
+            );
+
+            // 🔁 REPLICAR DESPESA FIXA ATÉ DEZEMBRO (CORREÇÃO 1)
+            const diaOriginal = baseDate.getDate();
+            const mesOriginal = baseDate.getMonth();
+            const ano = baseDate.getFullYear();
+
+            // Função melhorada para ajustar datas (CORREÇÃO 3)
+            const ajustarDiaDoMes = (diaOriginal, targetMes, targetAno) => {
+                const ultimoDiaTargetMes = new Date(targetAno, targetMes + 1, 0).getDate();
+
+                // Se o dia original é maior que o último dia do mês de destino, 
+                // usar o último dia do mês de destino
+                return Math.min(diaOriginal, ultimoDiaTargetMes);
+            };
+
+            for (let mes = mesOriginal + 1; mes <= 11; mes++) {
+                const diaAjustado = ajustarDiaDoMes(diaOriginal, mes, ano);
+                const dataReplicada = new Date(ano, mes, diaAjustado);
+
+                // Calcular competência para cada mês
+                const compReplicada = computeCompetencia({
+                    purchaseDate: dataReplicada,
+                    dueDay: Number(dia_vencimento),
+                    closeDaysBefore: Number(dias_fechamento_antes ?? 10),
+                });
+
+                // Verificar se a competência não está paga
+                const pagoReplicada = await pool.query(
+                    `SELECT 1 FROM card_invoices_payments
+                WHERE user_id = $1 AND card_id = $2
+                  AND competencia_mes = $3 AND competencia_ano = $4`,
+                    [user_id, card_id, compReplicada.competencia_mes, compReplicada.competencia_ano]
+                );
+
+                // Se não estiver paga, inserir
+                if (pagoReplicada.rowCount === 0) {
+                    await pool.query(
+                        `INSERT INTO expenses (
+                    metodo_pagamento, tipo, quantidade, fixo, data,
+                    parcelas, frequencia, user_id, card_id, category_id, observacoes,
+                    competencia_mes, competencia_ano
+                  ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+                        [
+                            metodo_pagamento,
+                            tipo,
+                            quantidade,
+                            true, // 🔥 IMPORTANTE: manter fixo = true
+                            dataReplicada.toISOString().split("T")[0],
+                            parcelas_fixa,
+                            frequencia,
+                            user_id,
+                            card_id,
+                            category_id,
+                            observacoes || null,
+                            compReplicada.competencia_mes,
+                            compReplicada.competencia_ano,
+                        ]
+                    );
+                }
+            }
+
+            // Reduzir limite disponível apenas pelo valor do mês atual
+            // As futuras competências serão descontadas quando chegarem
+            await pool.query(
+                `UPDATE cards SET limite_disponivel = limite_disponivel - $1 WHERE id = $2`,
+                [quantidade, card_id]
+            );
+
+            return inserted.rows[0];
+        }
+
         // -------- À VISTA NO CARTÃO --------
         const inserted = await pool.query(
             `INSERT INTO expenses (
@@ -191,7 +296,7 @@ export const addExpense = async (expenseData) => {
                 tipo,
                 quantidade,
                 false,
-                (data ?? formattedBaseDate),
+                formattedBaseDate,
                 null,
                 frequencia,
                 user_id,
@@ -236,27 +341,21 @@ export const addExpense = async (expenseData) => {
 
     const baseExpense = result.rows[0];
 
-    // 🔁 Despesa fixa replicada até dezembro
+    // 🔁 Despesa fixa replicada até dezembro (CORRIGIDA - CORREÇÃO 3)
     if (fixo) {
         const diaOriginal = baseDate.getDate();
         const mesOriginal = baseDate.getMonth();
         const ano = baseDate.getFullYear();
-        const diasNoMesOriginal = new Date(ano, mesOriginal + 1, 0).getDate();
-        const ehUltimoDiaMes = diaOriginal === diasNoMesOriginal;
+
+        // Função melhorada para ajustar datas
+        const ajustarDiaDoMes = (diaOriginal, targetMes, targetAno) => {
+            const ultimoDiaTargetMes = new Date(targetAno, targetMes + 1, 0).getDate();
+            return Math.min(diaOriginal, ultimoDiaTargetMes);
+        };
 
         for (let mes = mesOriginal + 1; mes <= 11; mes++) {
-            const diasNoMesAlvo = new Date(ano, mes + 1, 0).getDate();
-            const diaParaInserir = ehUltimoDiaMes
-                ? diasNoMesAlvo
-                : diaOriginal > diasNoMesAlvo
-                    ? null
-                    : diaOriginal;
-
-            if (!diaParaInserir) continue;
-
-            const dataRep = `${ano}-${String(mes + 1).padStart(2, "0")}-${String(
-                diaParaInserir
-            ).padStart(2, "0")}`;
+            const diaAjustado = ajustarDiaDoMes(diaOriginal, mes, ano);
+            const dataReplicada = `${ano}-${String(mes + 1).padStart(2, "0")}-${String(diaAjustado).padStart(2, "0")}`;
 
             await pool.query(
                 `INSERT INTO expenses (
@@ -268,7 +367,7 @@ export const addExpense = async (expenseData) => {
                     tipo,
                     quantidade,
                     true,
-                    dataRep,
+                    dataReplicada,
                     parcelas,
                     frequencia,
                     user_id,
