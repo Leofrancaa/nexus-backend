@@ -21,17 +21,30 @@ export const createIncome = async (req, res) => {
             return res.status(201).json(created);
         }
 
-        // 🔁 Replicar até dezembro
-        // 🔁 Replicar receitas fixas até dezembro
+        // 🔁 Replicar receitas fixas até dezembro - ✅ LÓGICA CORRIGIDA
         const originalDate = new Date(created.data);
         const ano = originalDate.getFullYear();
         const diaOriginal = originalDate.getDate();
         const mesOriginal = originalDate.getMonth(); // 0-based
         const replicadas = [];
 
+        // Detecta se é último dia do mês
+        const ultimoDiaDoMesOriginal = new Date(ano, mesOriginal + 1, 0).getDate();
+        const ehUltimoDiaMes = diaOriginal === ultimoDiaDoMesOriginal;
+
         for (let m = mesOriginal + 1; m < 12; m++) {
-            const ultimoDiaDoMes = new Date(ano, m + 1, 0).getDate(); // último dia do mês
-            const diaAjustado = Math.min(diaOriginal, ultimoDiaDoMes); // evita dia 31 em meses que não tem
+            const ultimoDiaDoMes = new Date(ano, m + 1, 0).getDate();
+
+            // ✅ CORREÇÃO: Preserva o dia original, inclusive o dia 1
+            let diaAjustado;
+            if (ehUltimoDiaMes) {
+                // Se era o último dia do mês original, mantém como último dia
+                diaAjustado = ultimoDiaDoMes;
+            } else {
+                // ✅ MANTÉM O DIA ORIGINAL (inclusive dia 1)
+                // Só ajusta se o dia não existir no mês de destino
+                diaAjustado = Math.min(diaOriginal, ultimoDiaDoMes);
+            }
 
             const novaData = new Date(ano, m, diaAjustado);
             const copia = {
@@ -55,6 +68,7 @@ export const createIncome = async (req, res) => {
         res.status(500).json({ error: "Erro ao criar receita." });
     }
 };
+
 
 // Buscar receitas por intervalo
 export const getIncomes = async (req, res) => {

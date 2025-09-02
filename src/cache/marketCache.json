@@ -1,58 +1,58 @@
 {
-  "lastUpdated": "2025-08-12T14:52:39.770Z",
+  "lastUpdated": "2025-09-02T15:30:54.553Z",
   "data": {
     "dolar": {
       "nome": "USD/BRL",
-      "preco": 5.407,
-      "variacao": -0.5847485,
+      "preco": 5.4611,
+      "variacao": 0.39712176,
       "moeda": "BRL"
     },
     "euro": {
       "nome": "EUR/BRL",
-      "preco": 6.3044,
-      "variacao": -0.20239416,
+      "preco": 6.3668,
+      "variacao": -0.03296689,
       "moeda": "BRL"
     },
     "bitcoin": {
       "nome": "Bitcoin USD",
-      "preco": 119236.15,
-      "variacao": -0.6302181,
+      "preco": 111224.52,
+      "variacao": 2.3125145,
       "moeda": "USD"
     },
     "ethereum": {
       "nome": "Ethereum USD",
-      "preco": 4409.796,
-      "variacao": 3.0439312,
+      "preco": 4335.9736,
+      "variacao": -0.8136361,
       "moeda": "USD"
     },
     "solana": {
       "nome": "Solana USD",
-      "preco": 178.73834,
-      "variacao": -0.21775243,
+      "preco": 203.05443,
+      "variacao": 1.9869691,
       "moeda": "USD"
     },
     "ibovespa": {
       "nome": "IBOVESPA",
-      "preco": 137710.14,
-      "variacao": 1.5387238,
+      "preco": 140432.31,
+      "variacao": -0.6020699,
       "moeda": "BRL"
     },
     "bradesco": {
-      "nome": "BRADESCO    PN  EJ  N1",
-      "preco": 16.15,
-      "variacao": 1.5723271,
+      "nome": "BRADESCO    PN      N1",
+      "preco": 16.47,
+      "variacao": -1.3988494,
       "moeda": "BRL"
     },
     "petrobras": {
-      "nome": "PETROBRAS   PN  ATZ N2",
-      "preco": 31.19,
-      "variacao": 1.5299519,
+      "nome": "PETROBRAS   PN  EDJ N2",
+      "preco": 31.18,
+      "variacao": 0.03209316,
       "moeda": "BRL"
     },
     "vale": {
       "nome": "VALE        ON      NM",
-      "preco": 55.88,
-      "variacao": 0.99385476,
+      "preco": 55.25,
+      "variacao": -0.62949365,
       "moeda": "BRL"
     },
     "selic": {

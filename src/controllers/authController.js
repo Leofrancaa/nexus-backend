@@ -1,6 +1,8 @@
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { pool } from '../database/index.js'
+// src/controllers/authController.js
+import { requestPasswordReset, resetPassword } from '../services/passwordResetService.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'segredo_inseguro'
 const TOKEN_TTL_MS = 2 * 60 * 60 * 1000 // 2h
@@ -71,4 +73,36 @@ export const logoutUser = async (_req, res) => {
         : { httpOnly: true, secure: false, sameSite: 'lax', path: '/' }
 
     res.clearCookie('token', clearOpts).status(200).json({ message: 'Logout realizado com sucesso' })
+}
+
+
+
+export async function forgotPassword(req, res) {
+    const { email } = req.body;
+    try {
+        await requestPasswordReset(email, process.env.APP_BASE_URL);
+        // resposta sempre genérica
+        return res.json({ message: 'Se o e-mail existir, enviaremos um link de redefinição.' });
+    } catch (e) {
+        console.error(e);
+        return res.status(500).json({ error: 'Erro ao processar solicitação.' });
+    }
+}
+
+export async function performReset(req, res) {
+    const { token, novaSenha } = req.body;
+    if (!token || !novaSenha) return res.status(400).json({ error: 'Dados inválidos.' });
+
+    // políticas mínimas de senha (exemplo)
+    if (novaSenha.length < 8) return res.status(400).json({ error: 'Senha deve ter pelo menos 8 caracteres.' });
+
+    try {
+        await resetPassword(token, novaSenha);
+        return res.json({ message: 'Senha redefinida com sucesso.' });
+    } catch (e) {
+        const msg = e.message.includes('expirado') || e.message.includes('inválido') || e.message.includes('utilizado')
+            ? 'Link inválido ou expirado.'
+            : 'Erro ao redefinir senha.';
+        return res.status(400).json({ error: msg });
+    }
 }

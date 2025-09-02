@@ -72,8 +72,7 @@ export const addExpense = async (expenseData) => {
     if (isCreditCard) {
         const cardResult = await pool.query(
             `SELECT limite_disponivel, dia_vencimento, dias_fechamento_antes
-         FROM cards
-        WHERE id = $1`,
+             FROM cards WHERE id = $1`,
             [card_id]
         );
         if (cardResult.rows.length === 0) {
@@ -94,8 +93,8 @@ export const addExpense = async (expenseData) => {
         // 🔒 impedir lançamento em competência já paga
         const pago = await pool.query(
             `SELECT 1 FROM card_invoices_payments
-        WHERE user_id = $1 AND card_id = $2
-          AND competencia_mes = $3 AND competencia_ano = $4`,
+            WHERE user_id = $1 AND card_id = $2
+              AND competencia_mes = $3 AND competencia_ano = $4`,
             [user_id, card_id, competencia_mes, competencia_ano]
         );
         if (pago.rowCount > 0) {
@@ -129,23 +128,24 @@ export const addExpense = async (expenseData) => {
                 // impedir parcela em competência já paga
                 const pagoParcela = await pool.query(
                     `SELECT 1 FROM card_invoices_payments
-            WHERE user_id = $1 AND card_id = $2
-              AND competencia_mes = $3 AND competencia_ano = $4`,
+                    WHERE user_id = $1 AND card_id = $2
+                      AND competencia_mes = $3 AND competencia_ano = $4`,
                     [user_id, card_id, comp.competencia_mes, comp.competencia_ano]
                 );
                 if (pagoParcela.rowCount > 0) {
                     throw {
                         status: 400,
-                        message: `A competência ${String(comp.competencia_mes).padStart(2, "0")}/${comp.competencia_ano} já foi paga. Ajuste a data/parcelas.`,
+                        message: `A competência ${String(comp.competencia_mes).padStart(2, "0")}/${comp.competencia_ano} já foi paga.
+                        Ajuste a data/parcelas.`,
                     };
                 }
 
                 await pool.query(
                     `INSERT INTO expenses (
-            metodo_pagamento, tipo, quantidade, fixo, data,
-            parcelas, frequencia, user_id, card_id, category_id, observacoes,
-            competencia_mes, competencia_ano
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+                    metodo_pagamento, tipo, quantidade, fixo, data,
+                    parcelas, frequencia, user_id, card_id, category_id, observacoes,
+                    competencia_mes, competencia_ano
+                  ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
                     [
                         metodo_pagamento,
                         `${tipo} (${i + 1}/${parcelas})`,
@@ -181,11 +181,11 @@ export const addExpense = async (expenseData) => {
         // -------- À VISTA NO CARTÃO --------
         const inserted = await pool.query(
             `INSERT INTO expenses (
-        metodo_pagamento, tipo, quantidade, fixo, data,
-        parcelas, frequencia, user_id, card_id, category_id, observacoes,
-        competencia_mes, competencia_ano
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-      RETURNING *`,
+            metodo_pagamento, tipo, quantidade, fixo, data,
+            parcelas, frequencia, user_id, card_id, category_id, observacoes,
+            competencia_mes, competencia_ano
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+          RETURNING *`,
             [
                 metodo_pagamento,
                 tipo,
@@ -215,10 +215,10 @@ export const addExpense = async (expenseData) => {
     /* ===================== DESPESA COMUM ===================== */
     const result = await pool.query(
         `INSERT INTO expenses (
-      metodo_pagamento, tipo, quantidade, fixo, data,
-      parcelas, frequencia, user_id, card_id, category_id, observacoes
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-    RETURNING *`,
+          metodo_pagamento, tipo, quantidade, fixo, data,
+          parcelas, frequencia, user_id, card_id, category_id, observacoes
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        RETURNING *`,
         [
             metodo_pagamento,
             tipo,
@@ -236,7 +236,7 @@ export const addExpense = async (expenseData) => {
 
     const baseExpense = result.rows[0];
 
-    // 🔁 Despesa fixa replicada até dezembro
+    // 🔁 Despesa fixa replicada até dezembro - ✅ LÓGICA CORRIGIDA
     if (fixo) {
         const diaOriginal = baseDate.getDate();
         const mesOriginal = baseDate.getMonth();
@@ -246,13 +246,17 @@ export const addExpense = async (expenseData) => {
 
         for (let mes = mesOriginal + 1; mes <= 11; mes++) {
             const diasNoMesAlvo = new Date(ano, mes + 1, 0).getDate();
-            const diaParaInserir = ehUltimoDiaMes
-                ? diasNoMesAlvo
-                : diaOriginal > diasNoMesAlvo
-                    ? null
-                    : diaOriginal;
 
-            if (!diaParaInserir) continue;
+            // ✅ CORREÇÃO: Preserva o dia original, inclusive o dia 1
+            let diaParaInserir;
+            if (ehUltimoDiaMes) {
+                // Se era o último dia do mês original, mantém como último dia
+                diaParaInserir = diasNoMesAlvo;
+            } else {
+                // ✅ MANTÉM O DIA ORIGINAL (inclusive dia 1)
+                // Só ajusta se o dia não existir no mês de destino
+                diaParaInserir = Math.min(diaOriginal, diasNoMesAlvo);
+            }
 
             const dataRep = `${ano}-${String(mes + 1).padStart(2, "0")}-${String(
                 diaParaInserir
@@ -260,9 +264,9 @@ export const addExpense = async (expenseData) => {
 
             await pool.query(
                 `INSERT INTO expenses (
-          metodo_pagamento, tipo, quantidade, fixo, data,
-          parcelas, frequencia, user_id, card_id, category_id, observacoes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                  metodo_pagamento, tipo, quantidade, fixo, data,
+                  parcelas, frequencia, user_id, card_id, category_id, observacoes
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
                 [
                     metodo_pagamento,
                     tipo,
@@ -282,6 +286,7 @@ export const addExpense = async (expenseData) => {
 
     return baseExpense;
 };
+
 
 export const fetchExpensesByMonthYear = async (userId, mes, ano) => {
     const result = await pool.query(

@@ -15,8 +15,6 @@ import currencyRoutes from './src/routes/currencyRoutes.js'
 import planRoutes from "./src/routes/planRoutes.js";
 import financeRoutes from './src/routes/financeRoutes.js';
 
-
-
 import cookieParser from 'cookie-parser'
 
 dotenv.config()
