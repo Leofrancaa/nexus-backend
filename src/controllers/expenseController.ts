@@ -1,3 +1,4 @@
+// src/controllers/expenseController.ts
 import { Request, Response, NextFunction } from 'express'
 import { ExpenseService } from '../services/expenseService'
 import { DatabaseUtils } from '../utils/database'
@@ -250,7 +251,7 @@ export const getMonthlyTotal = async (
 }
 
 /**
- * GET /api/expenses/stats - Estatísticas de despesas
+ * GET /api/expenses/stats - Estatísticas de despesas (CORRIGIDO)
  */
 export const getExpenseStats = async (
     req: Request,
@@ -262,51 +263,41 @@ export const getExpenseStats = async (
         const userId = authReq.user.id
         const { month, year, categoryId } = req.query
 
-        const mes = toNumber(month)
-        const ano = toNumber(year)
-        const catId = categoryId ? toNumber(categoryId) : null
+        const mesRaw = toNumber(month)
+        const anoRaw = toNumber(year)
+        const catIdRaw = categoryId ? toNumber(categoryId) : undefined
+
+        // Garantir que mes, ano e catId sejam number ou undefined, nunca null
+        const mes: number | undefined = typeof mesRaw === 'number' && !isNaN(mesRaw) ? mesRaw : undefined
+        const ano: number | undefined = typeof anoRaw === 'number' && !isNaN(anoRaw) ? anoRaw : undefined
+        const catId: number | undefined = typeof catIdRaw === 'number' && !isNaN(catIdRaw) ? catIdRaw : undefined
 
         if (!mes || !ano || mes < 1 || mes > 12) {
             sendErrorResponse(res, 'Parâmetros month e year são obrigatórios e devem ser válidos.', 400)
             return
         }
 
+        // Buscar estatísticas do mês atual
+        const atual = await ExpenseService.getExpenseStats(userId, mes, ano, catId)
+
         // Calcular mês anterior para comparação
-        const mesAnterior = mes === 1 ? 12 : mes - 1
-        const anoAnterior = mes === 1 ? ano - 1 : ano
+        const mesAnterior: number = mes === 1 ? 12 : mes - 1
+        const anoAnterior: number = mes === 1 ? (ano as number) - 1 : (ano as number)
 
-        // Buscar estatísticas do mês atual e anterior
-        const [atualTotal, anteriorTotal] = await Promise.all([
-            ExpenseService.getMonthlyTotal(userId, mes, ano),
-            ExpenseService.getMonthlyTotal(userId, mesAnterior, anoAnterior)
-        ])
-
-        // Se há filtro por categoria, buscar dados específicos
-        let categoriaAtual = 0
-        let categoriaAnterior = 0
-
-        if (catId) {
-            [categoriaAtual, categoriaAnterior] = await Promise.all([
-                ExpenseService.getTotalByCategory(userId, catId, mes, ano),
-                ExpenseService.getTotalByCategory(userId, catId, mesAnterior, anoAnterior)
-            ])
-        }
+        const anterior = await ExpenseService.getExpenseStats(userId, mesAnterior, anoAnterior, catId)
 
         const stats = {
-            total: catId ? categoriaAtual : atualTotal,
-            anterior: catId ? categoriaAnterior : anteriorTotal,
-            variacao: 0
+            total: Number(atual.total || 0),
+            fixas: Number(atual.fixas || 0),
+            transacoes: Number(atual.transacoes || 0),
+            media: Number(atual.media || 0),
+            anterior: Number(anterior.total || 0),
         }
 
-        // Calcular variação percentual
-        if (stats.anterior > 0) {
-            stats.variacao = ((stats.total - stats.anterior) / stats.anterior) * 100
-        }
-
-        sendSuccessResponse(res, stats, 'Estatísticas recuperadas com sucesso.')
+        sendSuccessResponse(res, stats, 'Estatísticas de despesas recuperadas com sucesso.')
     } catch (error) {
-        console.error('Erro ao buscar estatísticas:', error)
-        sendErrorResponse(res, 'Erro ao buscar estatísticas.', 500, error)
+        console.error('Erro ao buscar estatísticas de despesas:', error)
+        sendErrorResponse(res, 'Erro ao buscar estatísticas de despesas.', 500, error)
     }
 }
 
@@ -325,12 +316,12 @@ export const getExpensesByMonth = async (
         // Query para buscar despesas agrupadas por mês usando DatabaseUtils
         const result = await DatabaseUtils.query<ExpenseMonthlyResult>(
             `SELECT 
-        EXTRACT(MONTH FROM data) AS numero_mes,
-        SUM(quantidade) AS total
-       FROM expenses
-       WHERE user_id = $1
-       GROUP BY numero_mes
-       ORDER BY numero_mes`,
+                EXTRACT(MONTH FROM data) AS numero_mes,
+                SUM(quantidade) AS total
+             FROM expenses
+             WHERE user_id = $1
+             GROUP BY numero_mes
+             ORDER BY numero_mes`,
             [userId]
         )
 
@@ -377,35 +368,10 @@ export const getResumoCategorias = async (
             return
         }
 
-        const result = await DatabaseUtils.query(
-            `SELECT 
-        c.nome,
-        c.cor,
-        COUNT(e.id) as quantidade,
-        SUM(e.quantidade) as total
-      FROM expenses e
-      JOIN categories c ON c.id = e.category_id
-      WHERE e.user_id = $1 
-        AND EXTRACT(MONTH FROM e.data) = $2 
-        AND EXTRACT(YEAR FROM e.data) = $3
-      GROUP BY c.nome, c.cor
-      ORDER BY total DESC`,
-            [userId, month, year]
-        )
-
-        const totalGeral = result.rows.reduce((acc: number, r: any) => acc + Number(r.total), 0)
-
-        const dados = result.rows.map((r: any) => ({
-            nome: r.nome,
-            cor: r.cor,
-            quantidade: Number(r.quantidade),
-            total: Number(r.total),
-            percentual: totalGeral > 0 ? (Number(r.total) / totalGeral) * 100 : 0,
-        }))
-
-        sendSuccessResponse(res, dados, 'Resumo de categorias recuperado com sucesso.')
+        const resumo = await ExpenseService.getExpensesByCategory(userId, month, year)
+        sendSuccessResponse(res, resumo, 'Resumo por categorias recuperado com sucesso.')
     } catch (error) {
-        console.error('Erro ao buscar resumo de categorias:', error)
-        sendErrorResponse(res, 'Erro ao buscar resumo de categorias.', 500, error)
+        console.error('Erro ao buscar resumo por categorias:', error)
+        sendErrorResponse(res, 'Erro ao buscar resumo por categorias.', 500, error)
     }
 }

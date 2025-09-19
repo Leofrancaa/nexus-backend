@@ -1,3 +1,4 @@
+// src/services/planService.ts
 import { pool } from '../database/index'
 import { QueryResult } from 'pg'
 import {
@@ -72,8 +73,8 @@ export class PlanService {
 
         const result: QueryResult<Plan> = await pool.query(
             `INSERT INTO plans (user_id, nome, descricao, meta, prazo, status, total_contribuido)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING *`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             RETURNING *`,
             [
                 userId,
                 sanitizeString(nome.trim()),
@@ -92,36 +93,74 @@ export class PlanService {
      * Busca planos do usuário
      */
     static async getPlansByUser(userId: number): Promise<PlanWithProgress[]> {
-        const result: QueryResult<Plan> = await pool.query(
-            'SELECT * FROM plans WHERE user_id = $1 ORDER BY created_at DESC',
-            [userId]
-        )
+        try {
+            console.log('[getPlansByUser] Buscando planos para userId:', userId)
 
-        // Calcular progresso e estatísticas para cada plano
-        const plansWithProgress = await Promise.all(
-            result.rows.map(async (plan) => {
-                const progress = await this.calculatePlanProgress(plan)
-                return progress
-            })
-        )
+            const result: QueryResult<Plan> = await pool.query(
+                'SELECT * FROM plans WHERE user_id = $1 ORDER BY created_at DESC',
+                [userId]
+            )
 
-        return plansWithProgress
+            console.log('[getPlansByUser] Planos encontrados no banco:', result.rows.length)
+
+            // Se não há planos, retornar array vazio
+            if (result.rows.length === 0) {
+                return []
+            }
+
+            // Calcular progresso e estatísticas para cada plano
+            const plansWithProgress = await Promise.all(
+                result.rows.map(async (plan) => {
+                    try {
+                        console.log('[getPlansByUser] Calculando progresso para plano:', plan.id)
+                        const progress = await this.calculatePlanProgress(plan)
+                        return progress
+                    } catch (error) {
+                        console.error(`Erro ao calcular progresso do plano ${plan.id}:`, error)
+                        // Retornar plano com valores padrão em caso de erro
+                        return {
+                            ...plan,
+                            meta: Number(plan.meta),
+                            total_contribuido: Number(plan.total_contribuido),
+                            progresso: 0,
+                            dias_restantes: 0,
+                            is_completed: false,
+                            is_overdue: false,
+                            contributions_count: 0,
+                            average_contribution: 0,
+                            last_contribution_date: null
+                        }
+                    }
+                })
+            )
+
+            console.log('[getPlansByUser] Retornando planos processados:', plansWithProgress.length)
+            return plansWithProgress
+        } catch (error) {
+            console.error('Erro em getPlansByUser:', error)
+            throw createErrorResponse('Erro ao buscar planos do usuário.', 500)
+        }
     }
 
     /**
      * Busca plano por ID
      */
     static async getPlanById(planId: number, userId: number): Promise<PlanWithProgress | null> {
-        const result: QueryResult<Plan> = await pool.query(
-            'SELECT * FROM plans WHERE id = $1 AND user_id = $2',
-            [planId, userId]
-        )
+        try {
+            const result: QueryResult<Plan> = await pool.query(
+                'SELECT * FROM plans WHERE id = $1 AND user_id = $2',
+                [planId, userId]
+            )
 
-        if (result.rows.length === 0) {
-            return null
+            if (result.rows.length === 0) {
+                return null
+            }
+
+            return await this.calculatePlanProgress(result.rows[0])
+        } catch (error) {
+            console.error('Erro em getPlanById:', error)
+            throw error
         }
-
-        return await this.calculatePlanProgress(result.rows[0])
     }
 
     /**
@@ -193,14 +232,14 @@ export class PlanService {
 
         const result: QueryResult<Plan> = await pool.query(
             `UPDATE plans SET
-        nome = COALESCE($1, nome),
-        descricao = COALESCE($2, descricao),
-        meta = COALESCE($3, meta),
-        prazo = COALESCE($4, prazo),
-        status = $5,
-        updated_at = NOW()
-       WHERE id = $6 AND user_id = $7
-       RETURNING *`,
+                nome = COALESCE($1, nome),
+                descricao = COALESCE($2, descricao),
+                meta = COALESCE($3, meta),
+                prazo = COALESCE($4, prazo),
+                status = $5,
+                updated_at = NOW()
+             WHERE id = $6 AND user_id = $7
+             RETURNING *`,
             [
                 nome ? sanitizeString(nome.trim()) : null,
                 descricao ? sanitizeString(descricao.trim()) : null,
@@ -302,8 +341,8 @@ export class PlanService {
             // Inserir contribuição
             const contributionResult: QueryResult<PlanContribution> = await client.query(
                 `INSERT INTO plan_contributions (plan_id, user_id, valor)
-         VALUES ($1, $2, $3)
-         RETURNING *`,
+                 VALUES ($1, $2, $3)
+                 RETURNING *`,
                 [planId, userId, valor]
             )
 
@@ -327,10 +366,10 @@ export class PlanService {
             // Atualizar plano
             await client.query(
                 `UPDATE plans SET 
-          total_contribuido = $1,
-          status = $2,
-          updated_at = NOW()
-         WHERE id = $3 AND user_id = $4`,
+                    total_contribuido = $1,
+                    status = $2,
+                    updated_at = NOW()
+                 WHERE id = $3 AND user_id = $4`,
                 [newTotal, newStatus, planId, userId]
             )
 
@@ -359,25 +398,36 @@ export class PlanService {
         userId: number,
         limit: number = 20
     ): Promise<PlanContribution[]> {
-        // Verificar se o plano pertence ao usuário
-        const planExists = await pool.query(
-            'SELECT 1 FROM plans WHERE id = $1 AND user_id = $2',
-            [planId, userId]
-        )
+        try {
+            // Verificar se o plano pertence ao usuário
+            const planExists = await pool.query(
+                'SELECT 1 FROM plans WHERE id = $1 AND user_id = $2',
+                [planId, userId]
+            )
 
-        if (planExists.rowCount === 0) {
-            throw createErrorResponse("Plano não encontrado.", 404)
+            if (planExists.rowCount === 0) {
+                throw createErrorResponse("Plano não encontrado.", 404)
+            }
+
+            const result: QueryResult<PlanContribution> = await pool.query(
+                `SELECT 
+                    id, 
+                    plan_id, 
+                    user_id, 
+                    valor, 
+                    created_at
+                 FROM plan_contributions
+                 WHERE plan_id = $1 AND user_id = $2
+                 ORDER BY created_at DESC
+                 LIMIT $3`,
+                [planId, userId, limit]
+            )
+
+            return result.rows
+        } catch (error) {
+            console.error('Erro em getPlanContributions:', error)
+            throw error
         }
-
-        const result: QueryResult<PlanContribution> = await pool.query(
-            `SELECT * FROM plan_contributions
-       WHERE plan_id = $1 AND user_id = $2
-       ORDER BY created_at DESC
-       LIMIT $3`,
-            [planId, userId, limit]
-        )
-
-        return result.rows
     }
 
     /**
@@ -436,11 +486,11 @@ export class PlanService {
             // Atualizar plano
             const updatedPlanResult: QueryResult<Plan> = await client.query(
                 `UPDATE plans SET 
-          total_contribuido = $1,
-          status = $2,
-          updated_at = NOW()
-         WHERE id = $3 AND user_id = $4
-         RETURNING *`,
+                    total_contribuido = $1,
+                    status = $2,
+                    updated_at = NOW()
+                 WHERE id = $3 AND user_id = $4
+                 RETURNING *`,
                 [newTotal, newStatus, planId, userId]
             )
 
@@ -463,39 +513,66 @@ export class PlanService {
      * Calcula o progresso e estatísticas de um plano
      */
     private static async calculatePlanProgress(plan: Plan): Promise<PlanWithProgress> {
-        const meta = Number(plan.meta)
-        const totalContribuido = Number(plan.total_contribuido)
-        const progresso = meta > 0 ? (totalContribuido / meta) * 100 : 0
+        try {
+            console.log('[calculatePlanProgress] Calculando progresso para plano:', plan.id)
 
-        // Calcular dias restantes
-        const prazoDate = new Date(`${plan.prazo}T23:59:59`)
-        const now = new Date()
-        const diasRestantes = Math.ceil((prazoDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+            const meta = Number(plan.meta)
+            const totalContribuido = Number(plan.total_contribuido)
+            const progresso = meta > 0 ? (totalContribuido / meta) * 100 : 0
 
-        // Buscar estatísticas de contribuições
-        const statsResult = await pool.query(
-            `SELECT 
-        COUNT(*) as contributions_count,
-        COALESCE(AVG(valor), 0) as average_contribution,
-        MAX(created_at) as last_contribution_date
-       FROM plan_contributions
-       WHERE plan_id = $1`,
-            [plan.id]
-        )
+            // Calcular dias restantes
+            const prazoDate = new Date(`${plan.prazo}T23:59:59`)
+            const now = new Date()
+            const diasRestantes = Math.ceil((prazoDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
-        const stats = statsResult.rows[0]
+            // Buscar estatísticas de contribuições
+            const statsResult = await pool.query(
+                `SELECT 
+                    COUNT(*) as contributions_count,
+                    COALESCE(AVG(valor), 0) as average_contribution,
+                    MAX(created_at) as last_contribution_date
+                 FROM plan_contributions
+                 WHERE plan_id = $1`,
+                [plan.id]
+            )
 
-        return {
-            ...plan,
-            meta: meta,
-            total_contribuido: totalContribuido,
-            progresso: Math.round(progresso * 100) / 100,
-            dias_restantes: Math.max(0, diasRestantes),
-            is_completed: progresso >= 100,
-            is_overdue: diasRestantes < 0 && progresso < 100,
-            contributions_count: Number(stats.contributions_count),
-            average_contribution: Number(stats.average_contribution || 0),
-            last_contribution_date: stats.last_contribution_date
+            const stats = statsResult.rows[0]
+
+            const result = {
+                ...plan,
+                meta: meta,
+                total_contribuido: totalContribuido,
+                progresso: Math.round(progresso * 100) / 100,
+                dias_restantes: Math.max(0, diasRestantes),
+                is_completed: progresso >= 100,
+                is_overdue: diasRestantes < 0 && progresso < 100,
+                contributions_count: Number(stats.contributions_count || 0),
+                average_contribution: Number(stats.average_contribution || 0),
+                last_contribution_date: stats.last_contribution_date || null
+            }
+
+            console.log('[calculatePlanProgress] Progresso calculado:', {
+                planId: plan.id,
+                progresso: result.progresso,
+                diasRestantes: result.dias_restantes
+            })
+
+            return result
+        } catch (error) {
+            console.error('[calculatePlanProgress] Erro ao calcular progresso:', error)
+            // Em caso de erro, retornar valores padrão
+            return {
+                ...plan,
+                meta: Number(plan.meta),
+                total_contribuido: Number(plan.total_contribuido),
+                progresso: 0,
+                dias_restantes: 0,
+                is_completed: false,
+                is_overdue: false,
+                contributions_count: 0,
+                average_contribution: 0,
+                last_contribution_date: null
+            }
         }
     }
 
@@ -511,32 +588,46 @@ export class PlanService {
         total_goals: number
         completion_rate: number
     }> {
-        const result = await pool.query(
-            `SELECT 
-        COUNT(*) as total_plans,
-        COUNT(CASE WHEN status = 'Concluído' THEN 1 END) as completed_plans,
-        COUNT(CASE WHEN status IN ('Em progresso', 'Quase lá') THEN 1 END) as in_progress_plans,
-        COUNT(CASE WHEN prazo < CURRENT_DATE AND status != 'Concluído' THEN 1 END) as overdue_plans,
-        COALESCE(SUM(total_contribuido), 0) as total_saved,
-        COALESCE(SUM(meta), 0) as total_goals
-       FROM plans
-       WHERE user_id = $1`,
-            [userId]
-        )
+        try {
+            const result = await pool.query(
+                `SELECT 
+                    COUNT(*) as total_plans,
+                    COUNT(CASE WHEN status = 'Concluído' THEN 1 END) as completed_plans,
+                    COUNT(CASE WHEN status IN ('Em progresso', 'Quase lá') THEN 1 END) as in_progress_plans,
+                    COUNT(CASE WHEN prazo < CURRENT_DATE AND status != 'Concluído' THEN 1 END) as overdue_plans,
+                    COALESCE(SUM(total_contribuido), 0) as total_saved,
+                    COALESCE(SUM(meta), 0) as total_goals
+                 FROM plans
+                 WHERE user_id = $1`,
+                [userId]
+            )
 
-        const stats = result.rows[0]
-        const totalPlans = Number(stats.total_plans)
-        const completedPlans = Number(stats.completed_plans)
-        const completionRate = totalPlans > 0 ? (completedPlans / totalPlans) * 100 : 0
+            const stats = result.rows[0]
+            const totalPlans = Number(stats.total_plans || 0)
+            const completedPlans = Number(stats.completed_plans || 0)
+            const completionRate = totalPlans > 0 ? Math.round((completedPlans / totalPlans) * 100) : 0
 
-        return {
-            total_plans: totalPlans,
-            completed_plans: completedPlans,
-            in_progress_plans: Number(stats.in_progress_plans),
-            overdue_plans: Number(stats.overdue_plans),
-            total_saved: Number(stats.total_saved),
-            total_goals: Number(stats.total_goals),
-            completion_rate: Math.round(completionRate * 100) / 100
+            return {
+                total_plans: totalPlans,
+                completed_plans: completedPlans,
+                in_progress_plans: Number(stats.in_progress_plans || 0),
+                overdue_plans: Number(stats.overdue_plans || 0),
+                total_saved: Number(stats.total_saved || 0),
+                total_goals: Number(stats.total_goals || 0),
+                completion_rate: completionRate
+            }
+        } catch (error) {
+            console.error('Erro em getPlanStats:', error)
+            // Retornar valores padrão em caso de erro
+            return {
+                total_plans: 0,
+                completed_plans: 0,
+                in_progress_plans: 0,
+                overdue_plans: 0,
+                total_saved: 0,
+                total_goals: 0,
+                completion_rate: 0
+            }
         }
     }
 }
