@@ -1,243 +1,380 @@
-# 📊 Nexus Backend
+# 💰 Nexus Backend - TypeScript Edition
 
-Este é o backend da aplicação **Nexus**, uma ferramenta de controle financeiro pessoal. A API foi construída com **Node.js**, **Express**, **PostgreSQL** e integra-se com o **Supabase** como banco de dados.
+Sistema completo de controle financeiro pessoal desenvolvido em **TypeScript**, **Express**, **PostgreSQL** e **Supabase**.
 
----
+![TypeScript](https://img.shields.io/badge/TypeScript-5.3.3-blue?logo=typescript)
+![Node.js](https://img.shields.io/badge/Node.js-18+-green?logo=node.js)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue?logo=postgresql)
+![Express](https://img.shields.io/badge/Express-4.21+-lightgrey?logo=express)
 
-## 🚀 Tecnologias Utilizadas
+## 🚀 Como Rodar o Projeto
 
-- Node.js
-- Express.js
-- PostgreSQL
-- Supabase (PostgreSQL como serviço)
-- JWT (Autenticação)
-- Bcrypt (Hash de senha)
-- dotenv (Configuração de variáveis ambiente)
-- pg (Conexão com PostgreSQL)
+### **Pré-requisitos**
 
----
+- Node.js 18+
+- PostgreSQL (ou conta no Supabase)
+- npm ou yarn
 
-## 📂 Estrutura de Pastas
+### **1. Clonar e Instalar**
 
-```
-nexus-backend/
-│
-├── src/
-│   ├── controllers/         # Controladores de rotas
-│   ├── database/            # Conexão com banco (pool do PostgreSQL)
-│   ├── middlewares/         # Autenticação JWT
-│   ├── routes/              # Definição das rotas Express
-│   └── services/            # Lógica de negócios e queries SQL
-│
-├── .env                     # Variáveis de ambiente
-├── app.js                   # Entrada principal da aplicação
-└── package.json             # Dependências e scripts
-
+```bash
+git clone <repository-url>
+cd nexus-backend
+npm install
 ```
 
----
+### **2. Configurar Variáveis de Ambiente**
 
-## ⚙️ Variáveis de Ambiente
+Crie um arquivo `.env` na raiz:
 
-Crie um arquivo `.env` na raiz com o seguinte conteúdo:
+```env
+# Banco de Dados (Supabase ou PostgreSQL local)
+DATABASE_URL=postgresql://postgres:PASSWORD@HOST:5432/DATABASE
 
-```
-DATABASE_URL=postgresql://postgres:<SUA_SENHA>@<host_do_supabase>:5432/postgres
+# JWT Secret (gere uma chave segura)
+JWT_SECRET=sua_chave_jwt_super_segura_aqui
+
+# Porta do servidor
 PORT=3001
-JWT_SECRET=sua_chave_jwt_segura
 
-````
+# Ambiente
+NODE_ENV=development
+```
 
----
+### **3. Executar em Desenvolvimento**
 
-## 🧪 Scripts
+```bash
+# Compilar TypeScript e rodar em modo watch
+npm run dev
 
-- `npm install` – Instala dependências
-- `npm run dev` – Inicia o servidor em modo desenvolvimento com `nodemon`
+# Ou compilar e rodar separadamente
+npm run build
+npm start
 
-Adicione no `package.json`:
+# Verificar tipos sem executar
+npm run type-check
+```
+
+### **4. Testar a API**
+
+```bash
+# Executar suite de testes
+npm test
+
+# Health check
+curl http://localhost:3001/health
+```
+
+## 📋 Scripts Disponíveis
 
 ```json
-"scripts": {
-  "dev": "nodemon app.js"
+{
+  "build": "tsc", // Compilar TypeScript
+  "start": "node dist/app.js", // Rodar versão compilada
+  "dev": "tsx watch src/app.ts", // Desenvolvimento com hot reload
+  "type-check": "tsc --noEmit", // Verificar tipos
+  "clean": "rm -rf dist" // Limpar build
 }
-````
+```
 
----
+## 🧪 Testando o Sistema
+
+### **Health Check**
+
+```bash
+curl http://localhost:3001/health
+# Resposta esperada: {"status":"OK","version":"2.0.0",...}
+```
+
+### **Ping Database**
+
+```bash
+curl http://localhost:3001/ping
+# Resposta esperada: {"status":"OK","message":"Banco conectado!",...}
+```
 
 ## 🔐 Autenticação
 
-Utiliza JWT para autenticação. Após login, o token deve ser enviado no header `Authorization` como:
+### **1. Registrar Usuário**
 
-```
-Bearer <seu_token_aqui>
-```
-
----
-
-## 📌 Endpoints
-
-### 🔑 Auth
-
-* `POST /auth/register`
-  Registra um novo usuário.
-  Body:
-
-  ```json
-  {
-    "nome": "Leonardo",
-    "email": "leo@email.com",
+```bash
+curl -X POST http://localhost:3001/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nome": "João Silva",
+    "email": "joao@email.com",
     "senha": "123456"
-  }
-  ```
+  }'
+```
 
-* `POST /auth/login`
-  Retorna token de autenticação.
-  Body:
+### **2. Fazer Login**
 
-  ```json
-  {
-    "email": "leo@email.com",
+```bash
+curl -X POST http://localhost:3001/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "joao@email.com",
     "senha": "123456"
-  }
-  ```
+  }'
+```
 
----
+### **3. Usar Token nas Requisições**
 
-### 💸 Despesas (`/expenses`)
+```bash
+# Salvar o token retornado no login
+TOKEN="seu_jwt_token_aqui"
 
-* `POST /expenses`
-* `GET /expenses?mes=7&ano=2025`
-* `PUT /expenses/:id`
-* `DELETE /expenses/:id`
+# Usar em todas as requisições autenticadas
+curl -H "Authorization: Bearer $TOKEN" \
+  http://localhost:3001/api/dashboard
+```
 
-Campos esperados:
+## 📊 Endpoints Principais
 
-```json
+### **Dashboard**
+
+```bash
+# Dashboard completo
+GET /api/dashboard
+
+# Estatísticas rápidas
+GET /api/dashboard/quick-stats
+
+# Tendências (últimos 6 meses)
+GET /api/dashboard/trends
+```
+
+### **Despesas**
+
+```bash
+# Criar despesa
+POST /api/expenses
 {
-  "descricao": "Almoço",
-  "valor": 50,
-  "data": "2025-07-22",
-  "forma_pagamento": "dinheiro",
-  "categoria_id": 1,
-  "cartao_id": null (ou id de cartão)
+  "metodo_pagamento": "credito",
+  "tipo": "Alimentação",
+  "quantidade": 50.00,
+  "data": "2025-01-15",
+  "card_id": 1,
+  "category_id": 1
+}
+
+# Listar despesas
+GET /api/expenses?start_date=2025-01-01&end_date=2025-01-31
+
+# Estatísticas
+GET /api/expenses/stats?month=1&year=2025
+```
+
+### **Receitas**
+
+```bash
+# Criar receita
+POST /api/incomes
+{
+  "tipo": "Salário",
+  "quantidade": 3000.00,
+  "data": "2025-01-01",
+  "fixo": true,
+  "category_id": 1
+}
+
+# Listar receitas
+GET /api/incomes?start_date=2025-01-01&end_date=2025-01-31
+```
+
+### **Cartões**
+
+```bash
+# Criar cartão
+POST /api/cards
+{
+  "nome": "Nubank",
+  "tipo": "credito",
+  "numero": "1234",
+  "cor": "#8A2BE2",
+  "limite": 1000.00,
+  "dia_vencimento": 10
+}
+
+# Pagar fatura
+POST /api/cards/1/pay-invoice
+{
+  "mes": 1,
+  "ano": 2025
 }
 ```
 
----
+### **Categorias**
 
-### 💰 Receitas (`/incomes`)
-
-* `POST /incomes`
-* `GET /incomes?mes=7&ano=2025`
-* `PUT /incomes/:id`
-* `DELETE /incomes/:id`
-
-Campos esperados:
-
-```json
-{
-  "descricao": "Salário",
-  "valor": 3000,
-  "data": "2025-07-20",
-  "tipo": "fixa" (ou "variável")
-}
-```
-
----
-
-### 💳 Cartões (`/cards`)
-
-* `POST /cards`
-* `GET /cards`
-* `PUT /cards/:id`
-* `DELETE /cards/:id`
-
-Campos esperados:
-
-```json
-{
-  "apelido": "Nubank",
-  "numero": "1234", // últimos 4 dígitos
-  "cor": "#9BD60C"
-}
-```
-
----
-
-### 🏦 Investimentos (`/investments`)
-
-* `POST /investments`
-* `GET /investments?mes=7&ano=2025`
-* `PUT /investments/:id`
-* `DELETE /investments/:id`
-
-Campos esperados:
-
-```json
-{
-  "tipo": "Cripto",
-  "nome": "Bitcoin",
-  "quantidade": 0.05,
-  "descricao": "Compra mensal",
-  "data": "2025-07-10"
-}
-```
-
----
-
-### 🏷️ Categorias (`/categories`)
-
-* `POST /categories`
-* `GET /categories`
-* `PUT /categories/:id`
-* `DELETE /categories/:id`
-
-Campos esperados:
-
-```json
+```bash
+# Criar categoria
+POST /api/categories
 {
   "nome": "Alimentação",
-  "cor": "#FF5733"
+  "cor": "#FF6B6B",
+  "tipo": "despesa"
+}
+
+# Listar com hierarquia
+GET /api/categories?tree=true
+```
+
+### **Limites (Thresholds)**
+
+```bash
+# Criar limite
+POST /api/thresholds
+{
+  "category_id": 1,
+  "valor": 500.00
+}
+
+# Ver alertas
+GET /api/thresholds/alerts
+```
+
+### **Planos**
+
+```bash
+# Criar plano
+POST /api/plans
+{
+  "nome": "Viagem Europa",
+  "meta": 10000.00,
+  "prazo": "2025-12-31",
+  "descricao": "Férias em família"
+}
+
+# Contribuir
+POST /api/plans/1/contribute
+{
+  "valor": 500.00
 }
 ```
 
+## 🏗️ Arquitetura
+
+```
+src/
+├── controllers/     # HTTP request handlers
+├── services/        # Business logic layer
+├── routes/         # API route definitions
+├── middlewares/    # Custom middlewares
+├── types/          # TypeScript type definitions
+├── utils/          # Helper functions
+├── database/       # Database connection
+└── cache/          # Temporary cache files
+```
+
+## 🛡️ Segurança
+
+- ✅ **JWT Authentication** - Tokens seguros com expiração
+- ✅ **Password Hashing** - bcrypt com salt rounds
+- ✅ **Input Validation** - Sanitização de dados
+- ✅ **SQL Injection Protection** - Queries parametrizadas
+- ✅ **CORS Configuration** - Controle de origem
+- ✅ **Rate Limiting** - Proteção contra spam
+
+## 🎯 Features Implementadas
+
+### **💰 Gestão Financeira**
+
+- [x] Receitas e despesas com categorização
+- [x] Sistema completo de cartão de crédito
+- [x] Pagamento automático de faturas
+- [x] Receitas fixas com replicação mensal
+- [x] Despesas parceladas no cartão
+
+### **📊 Dashboard & Analytics**
+
+- [x] Dashboard completo com métricas
+- [x] Comparativos mensais
+- [x] Top categorias de gasto
+- [x] Tendências dos últimos 6 meses
+- [x] Alertas de cartões vencendo
+
+### **🎯 Planejamento**
+
+- [x] Metas financeiras (planos)
+- [x] Sistema de contribuições
+- [x] Cálculo automático de progresso
+- [x] Limites de gasto por categoria
+- [x] Alertas de threshold excedido
+
+### **🔧 Sistema**
+
+- [x] Multi-moeda (BRL, USD, EUR, GBP)
+- [x] Suporte hierárquico de categorias
+- [x] API RESTful completa
+- [x] Documentação automática via tipos
+- [x] Tratamento robusto de erros
+
+## 🚨 Troubleshooting
+
+### **Erro de Conexão com Banco**
+
+```bash
+# Verificar se o PostgreSQL está rodando
+pg_ctl status
+
+# Testar conexão manual
+psql $DATABASE_URL
+```
+
+### **Erro de Compilação TypeScript**
+
+```bash
+# Limpar cache e rebuild
+npm run clean
+npm run build
+
+# Verificar erros de tipo
+npm run type-check
+```
+
+### **Token JWT Inválido**
+
+```bash
+# Verificar se JWT_SECRET está definido
+echo $JWT_SECRET
+
+# Gerar novo token fazendo login novamente
+curl -X POST http://localhost:3001/auth/login ...
+```
+
+## 📈 Próximos Passos
+
+- [ ] Testes automatizados (Jest + Supertest)
+- [ ] Docker + Docker Compose
+- [ ] Documentação OpenAPI/Swagger
+- [ ] Rate limiting avançado
+- [ ] Cache Redis para performance
+- [ ] Webhook para notificações
+- [ ] Backup automático de dados
+- [ ] Logs estruturados
+
+## 🤝 Contribuição
+
+1. Fork o projeto
+2. Crie uma feature branch (`git checkout -b feature/nova-funcionalidade`)
+3. Commit suas mudanças (`git commit -am 'Adiciona nova funcionalidade'`)
+4. Push para a branch (`git push origin feature/nova-funcionalidade`)
+5. Abra um Pull Request
+
+## 📄 Licença
+
+Este projeto está sob a licença **MIT**. Veja o arquivo `LICENSE` para detalhes.
+
 ---
 
-## 🔐 Middleware
+## ⚡ Quick Start
 
-* `authenticateToken`: Middleware responsável por verificar e validar o token JWT em rotas protegidas.
+```bash
+# Clone, instale e execute em 30 segundos
+git clone <repo-url> && cd nexus-backend
+npm install
+cp .env.example .env  # Configure seu DATABASE_URL
+npm run dev
+```
 
----
-
-## ✅ Testes
-
-Utilize o **Insomnia** ou **Postman** para testar todas as rotas com e sem token JWT.
-Certifique-se de sempre enviar `Authorization: Bearer <token>` nas rotas protegidas.
-
----
-
-## 🧠 Observações
-
-* Cada usuário acessa **apenas seus próprios dados**.
-* Integração com Supabase é feita via conexão direta PostgreSQL (`DATABASE_URL`).
-* Tabelas com chaves estrangeiras garantem integridade referencial.
-
----
-
-## 📅 Futuro
-
-* Validação com `Joi` ou `Zod`
-* Paginação de resultados
-* Exportação de dados (CSV, PDF)
-* Notificações por e-mail/SMS
-* Dashboard com alertas de limite
-
----
-
-## 👨‍💻 Autor
-
-Desenvolvido por **Leonardo Franca Almeida Silva**
-Engenharia de Computação · CIMATEC · 2025
-
-
+**🎉 Pronto! Sua API está rodando em `http://localhost:3001`**

@@ -1,44 +1,79 @@
 {
+<<<<<<< HEAD
   "lastUpdated": "2025-08-24T16:39:52.245Z",
   "data": {
     "dolar": {
       "nome": "USD/BRL",
       "preco": 5.4227,
       "variacao": -0.79579866,
+=======
+  "lastUpdated": "2025-09-02T15:30:54.553Z",
+  "data": {
+    "dolar": {
+      "nome": "USD/BRL",
+      "preco": 5.4611,
+      "variacao": 0.39712176,
+>>>>>>> 7d9bc183ec1f8a544769d5735653aa634651106c
       "moeda": "BRL"
     },
     "euro": {
       "nome": "EUR/BRL",
+<<<<<<< HEAD
       "preco": 6.353,
       "variacao": 0.12924235,
+=======
+      "preco": 6.3668,
+      "variacao": -0.03296689,
+>>>>>>> 7d9bc183ec1f8a544769d5735653aa634651106c
       "moeda": "BRL"
     },
     "bitcoin": {
       "nome": "Bitcoin USD",
+<<<<<<< HEAD
       "preco": 114411.94,
       "variacao": -0.3636632,
+=======
+      "preco": 111224.52,
+      "variacao": 2.3125145,
+>>>>>>> 7d9bc183ec1f8a544769d5735653aa634651106c
       "moeda": "USD"
     },
     "ethereum": {
       "nome": "Ethereum USD",
+<<<<<<< HEAD
       "preco": 4821.5635,
       "variacao": 1.4537737,
+=======
+      "preco": 4335.9736,
+      "variacao": -0.8136361,
+>>>>>>> 7d9bc183ec1f8a544769d5735653aa634651106c
       "moeda": "USD"
     },
     "solana": {
       "nome": "Solana USD",
+<<<<<<< HEAD
       "preco": 206.24971,
       "variacao": 1.706941,
+=======
+      "preco": 203.05443,
+      "variacao": 1.9869691,
+>>>>>>> 7d9bc183ec1f8a544769d5735653aa634651106c
       "moeda": "USD"
     },
     "ibovespa": {
       "nome": "IBOVESPA",
+<<<<<<< HEAD
       "preco": 137968.16,
       "variacao": 2.5702853,
+=======
+      "preco": 140432.31,
+      "variacao": -0.6020699,
+>>>>>>> 7d9bc183ec1f8a544769d5735653aa634651106c
       "moeda": "BRL"
     },
     "bradesco": {
       "nome": "BRADESCO    PN      N1",
+<<<<<<< HEAD
       "preco": 16.31,
       "variacao": 3.2932203,
       "moeda": "BRL"
@@ -53,6 +88,22 @@
       "nome": "VALE        ON  EJ  NM",
       "preco": 54.79,
       "variacao": 2.5070162,
+=======
+      "preco": 16.47,
+      "variacao": -1.3988494,
+      "moeda": "BRL"
+    },
+    "petrobras": {
+      "nome": "PETROBRAS   PN  EDJ N2",
+      "preco": 31.18,
+      "variacao": 0.03209316,
+      "moeda": "BRL"
+    },
+    "vale": {
+      "nome": "VALE        ON      NM",
+      "preco": 55.25,
+      "variacao": -0.62949365,
+>>>>>>> 7d9bc183ec1f8a544769d5735653aa634651106c
       "moeda": "BRL"
     },
     "selic": {
