@@ -1,6 +1,6 @@
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg'
-import { pool } from '../database/index.js'
-import { BaseQueryResult, CountResult, ExistsResult } from '../types/database.js'
+import { pool } from '../database/index'
+import { BaseQueryResult, CountResult, ExistsResult } from '../types/database'
 
 /**
  * Wrapper tipado para queries do PostgreSQL

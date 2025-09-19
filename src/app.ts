@@ -1,19 +1,19 @@
 import express, { Application, Request, Response } from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
-import { pool, testConnection } from './database/index.js'
+import { pool, testConnection } from './database/index'
 
 // Routes - agora com caminhos relativos corretos
-import authRoutes from './routes/authRoutes.js'
-import expenseRoutes from './routes/expenseRoutes.js'
-import incomeRoutes from './routes/incomeRoutes.js'
-import cardRoutes from './routes/cardRoutes.js'
-import categoryRoutes from './routes/categoryRoutes.js'
-import thresholdRoutes from './routes/thresholdRoutes.js'
-import dashboardRoutes from './routes/dashboardRoutes.js'
-import userRoutes from './routes/userRoutes.js'
-import currencyRoutes from './routes/currencyRoutes.js'
-import planRoutes from './routes/planRoutes.js'
+import authRoutes from './routes/authRoutes'
+import expenseRoutes from './routes/expenseRoutes'
+import incomeRoutes from './routes/incomeRoutes'
+import cardRoutes from './routes/cardRoutes'
+import categoryRoutes from './routes/categoryRoutes'
+import thresholdRoutes from './routes/thresholdRoutes'
+import dashboardRoutes from './routes/dashboardRoutes'
+import userRoutes from './routes/userRoutes'
+import currencyRoutes from './routes/currencyRoutes'
+import planRoutes from './routes/planRoutes'
 
 // Carregar variáveis de ambiente
 dotenv.config()

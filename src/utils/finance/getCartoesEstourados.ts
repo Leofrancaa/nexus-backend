@@ -1,5 +1,5 @@
 // src/utils/finance/getCartoesEstourados.ts
-import { DatabaseUtils } from '../database.js'
+import { DatabaseUtils } from '../database'
 
 interface CartoesEstouradosQueryResult {
     id: number

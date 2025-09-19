@@ -1,14 +1,14 @@
 import { Request, Response, NextFunction } from 'express'
-import { CurrencyService } from '../services/currencyService.js'
+import { CurrencyService } from '../services/currencyService'
 import {
     AuthenticatedRequest,
     ApiError
-} from '../types/index.js'
+} from '../types/index'
 import {
     sendErrorResponse,
     sendSuccessResponse,
     toNumber
-} from '../utils/helper.js'
+} from '../utils/helper'
 
 /**
  * GET /api/users/currency - Buscar moeda atual do usuário

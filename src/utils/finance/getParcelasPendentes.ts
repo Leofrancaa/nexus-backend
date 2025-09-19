@@ -1,6 +1,6 @@
 // src/utils/finance/getParcelasPendentes.ts
-import { DatabaseUtils } from '../database.js'
-import { formatDate } from '../helper.js'
+import { DatabaseUtils } from '../database'
+import { formatDate } from '../helper'
 
 interface ParcelasPendentesQueryResult {
     id: number

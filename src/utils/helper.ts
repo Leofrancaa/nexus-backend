@@ -1,5 +1,5 @@
 import { Response } from 'express'
-import { ApiError, ApiResponse } from '../types/index.js'
+import { ApiError, ApiResponse } from '../types/index'
 
 /**
  * Normaliza string removendo acentos e convertendo para lowercase

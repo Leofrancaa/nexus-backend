@@ -1,17 +1,17 @@
 import { Request, Response, NextFunction } from 'express'
-import { CardService } from '../services/cardService.js'
+import { CardService } from '../services/cardService'
 import {
     AuthenticatedRequest,
     CreateCardRequest,
     ApiError
-} from '../types/index.js'
+} from '../types/index'
 import {
     sendErrorResponse,
     sendSuccessResponse,
     toNumber,
     isPositiveNumber,
     isValidHexColor
-} from '../utils/helper.js'
+} from '../utils/helper'
 
 /**
  * POST /api/cards - Criar cartão

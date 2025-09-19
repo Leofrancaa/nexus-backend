@@ -1,7 +1,5 @@
-import { pool } from '../database/index.js'
-import { QueryResult } from 'pg'
-import { DashboardData } from '../types/index.js'
-import { DatabaseUtils } from '../utils/database.js'
+import { pool } from '../database/index'
+import { DashboardData } from '../types/index'
 
 export class DashboardService {
     /**

@@ -1,5 +1,5 @@
 // src/utils/finance/getDespesasDoMes.ts
-import { DatabaseUtils } from '../database.js'
+import { DatabaseUtils } from '../database'
 
 interface DespesasDoMesQueryResult {
     id: number

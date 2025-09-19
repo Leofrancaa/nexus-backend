@@ -1,15 +1,15 @@
 import { Request, Response, NextFunction } from 'express'
-import { CategoryService } from '../services/categoryService.js'
+import { CategoryService } from '../services/categoryService'
 import {
     AuthenticatedRequest,
     CreateCategoryRequest,
     ApiError
-} from '../types/index.js'
+} from '../types/index'
 import {
     sendErrorResponse,
     sendSuccessResponse,
     toNumber
-} from '../utils/helper.js'
+} from '../utils/helper'
 
 /**
  * POST /api/categories - Criar categoria

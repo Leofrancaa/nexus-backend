@@ -1,16 +1,16 @@
 import { Request, Response, NextFunction } from 'express'
-import { ThresholdService } from '../services/thresholdService.js'
+import { ThresholdService } from '../services/thresholdService'
 import {
     AuthenticatedRequest,
     CreateThresholdRequest,
     ApiError
-} from '../types/index.js'
+} from '../types/index'
 import {
     sendErrorResponse,
     sendSuccessResponse,
     toNumber,
     isPositiveNumber
-} from '../utils/helper.js'
+} from '../utils/helper'
 
 /**
  * POST /api/thresholds - Criar ou atualizar threshold

@@ -8,8 +8,8 @@ import {
   getThresholdAlerts,
   checkThresholdViolation,
   getThresholdStats
-} from '../controllers/thresholdController.js'
-import { authenticateToken } from '../middlewares/authMiddleware.js'
+} from '../controllers/thresholdController'
+import { authenticateToken } from '../middlewares/authMiddleware'
 
 const router = Router()
 

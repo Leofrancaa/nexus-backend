@@ -1,5 +1,5 @@
 // src/utils/finance/getCartoesAVencer.ts
-import { DatabaseUtils } from '../database.js'
+import { DatabaseUtils } from '../database'
 
 interface CartoesAVencerQueryResult {
     id: number

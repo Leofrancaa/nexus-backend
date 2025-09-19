@@ -1,5 +1,5 @@
 // src/utils/finance/getReceitasDoMes.ts
-import { DatabaseUtils } from '../database.js'
+import { DatabaseUtils } from '../database'
 
 interface ReceitasDoMesQueryResult {
     id: number

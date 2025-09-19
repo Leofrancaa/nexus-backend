@@ -1,18 +1,17 @@
-import { pool } from '../database/index.js'
+import { pool } from '../database/index'
 import { QueryResult } from 'pg'
 import {
     Expense,
     CreateExpenseRequest,
-    ApiError
-} from '../types/index.js'
+} from '../types/index'
 import {
     normalize,
     addMonthsSafe,
     formatDate,
     calculateCompetencia,
     createErrorResponse
-} from '../utils/helper.js'
-import { DatabaseUtils } from '../utils/database.js'
+} from '../utils/helper'
+
 
 interface ExpenseWithCategory extends Expense {
     categoria_nome?: string

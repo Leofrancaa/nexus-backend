@@ -5,15 +5,15 @@ import {
     getCard,
     updateCard,
     deleteCard
-} from '../controllers/cardController.js'
+} from '../controllers/cardController'
 import {
     payInvoice,
     getAvailableInvoices,
     getPaymentHistory,
     cancelInvoicePayment,
     canPayInvoice
-} from '../controllers/cardInvoiceController.js'
-import { authenticateToken } from '../middlewares/authMiddleware.js'
+} from '../controllers/cardInvoiceController'
+import { authenticateToken } from '../middlewares/authMiddleware'
 
 const router = Router()
 

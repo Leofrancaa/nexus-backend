@@ -9,8 +9,8 @@ import {
     updateIncome,
     deleteIncome,
     getCategoryResume
-} from '../controllers/incomeController.js'
-import { authenticateToken } from '../middlewares/authMiddleware.js'
+} from '../controllers/incomeController'
+import { authenticateToken } from '../middlewares/authMiddleware'
 
 const router = Router()
 

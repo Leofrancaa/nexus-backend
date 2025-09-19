@@ -1,14 +1,14 @@
 import { Request, Response, NextFunction } from 'express'
-import { CardInvoiceService } from '../services/cardInvoiceService.js'
+import { CardInvoiceService } from '../services/cardInvoiceService'
 import {
     AuthenticatedRequest,
     ApiError
-} from '../types/index.js'
+} from '../types/index'
 import {
     sendErrorResponse,
     sendSuccessResponse,
     toNumber
-} from '../utils/helper.js'
+} from '../utils/helper'
 
 /**
  * POST /api/cards/:id/pay-invoice - Pagar fatura do cartão

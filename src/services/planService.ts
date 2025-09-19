@@ -1,18 +1,16 @@
-import { pool } from '../database/index.js'
+import { pool } from '../database/index'
 import { QueryResult } from 'pg'
 import {
     Plan,
     CreatePlanRequest,
     ContributionRequest,
-    ApiError
-} from '../types/index.js'
+} from '../types/index'
 import {
     createErrorResponse,
     isPositiveNumber,
     isValidDateString,
     sanitizeString
-} from '../utils/helper.js'
-import { DatabaseUtils } from '../utils/database.js'
+} from '../utils/helper'
 
 interface PlanWithProgress extends Plan {
     progresso: number

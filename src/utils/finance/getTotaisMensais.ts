@@ -1,5 +1,5 @@
 // src/utils/finance/getTotaisMensais.ts
-import { DatabaseUtils } from '../database.js'
+import { DatabaseUtils } from '../database'
 
 interface MensalQueryResult {
     mes: number

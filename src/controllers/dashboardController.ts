@@ -1,7 +1,7 @@
 // src/controllers/dashboardController.ts
 import { Request, Response } from 'express'
-import { AuthenticatedRequest, DashboardData } from '../types/index.js'
-import { sendSuccessResponse, sendErrorResponse } from '../utils/helper.js'
+import { AuthenticatedRequest, DashboardData } from '../types/index'
+import { sendSuccessResponse, sendErrorResponse } from '../utils/helper'
 import {
     getSaldoAtual,
     getSaldoFuturo,
@@ -21,7 +21,7 @@ import {
     type CartoesAVencerResult,
     type ParcelasPendentesResult,
     type ResumoAnualResult
-} from '../utils/finance/index.js'
+} from '../utils/finance/index'
 
 export const getDashboardData = async (req: Request, res: Response): Promise<void> => {
     try {

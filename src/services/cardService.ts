@@ -1,15 +1,13 @@
-import { pool } from '../database/index.js'
+import { pool } from '../database/index'
 import { QueryResult } from 'pg'
 import {
     Card,
     CreateCardRequest,
-    ApiError
-} from '../types/index.js'
+} from '../types/index'
 import {
     createErrorResponse,
     isPositiveNumber
-} from '../utils/helper.js'
-import { DatabaseUtils } from '../utils/database.js'
+} from '../utils/helper'
 
 interface CardWithStats extends Card {
     gasto_total: number

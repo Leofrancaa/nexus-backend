@@ -1,16 +1,16 @@
 import { Request, Response, NextFunction } from 'express'
-import { IncomeService } from '../services/incomeService.js'
+import { IncomeService } from '../services/incomeService'
 import {
     AuthenticatedRequest,
     CreateIncomeRequest,
     ApiError
-} from '../types/index.js'
+} from '../types/index'
 import {
     sendErrorResponse,
     sendSuccessResponse,
     toNumber,
     isPositiveNumber
-} from '../utils/helper.js'
+} from '../utils/helper'
 
 /**
  * POST /api/incomes - Criar receita

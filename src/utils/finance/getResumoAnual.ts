@@ -1,5 +1,5 @@
 // src/utils/finance/getResumoAnual.ts
-import { DatabaseUtils } from '../database.js'
+import { DatabaseUtils } from '../database'
 
 interface ResumoAnualQueryResult {
     mes: number

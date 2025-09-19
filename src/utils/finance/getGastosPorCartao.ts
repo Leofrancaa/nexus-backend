@@ -1,5 +1,5 @@
 // src/utils/finance/getGastosPorCartao.ts
-import { DatabaseUtils } from '../database.js'
+import { DatabaseUtils } from '../database'
 
 interface GastosPorCartaoQueryResult {
     cartao: string

@@ -6,10 +6,11 @@ import {
     getExpenseStats,
     getMonthlyTotal,
     getTotalByCategory,
+    getResumoCategorias,
     updateExpense,
     deleteExpense
-} from '../controllers/expenseController.js'
-import { authenticateToken } from '../middlewares/authMiddleware.js'
+} from '../controllers/expenseController'
+import { authenticateToken } from '../middlewares/authMiddleware'
 
 const router = Router()
 
@@ -33,6 +34,9 @@ router.get('/monthly-total', getMonthlyTotal)
 
 // GET /api/expenses/total-by-category/:categoryId - Total por categoria
 router.get('/total-by-category/:categoryId', getTotalByCategory)
+
+// GET /api/expenses/category-resume - Resumo por categorias
+router.get('/category-resume', getResumoCategorias)
 
 // PUT /api/expenses/:id - Atualizar despesa
 router.put('/:id', updateExpense)

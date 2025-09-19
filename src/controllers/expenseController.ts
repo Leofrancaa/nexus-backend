@@ -1,18 +1,18 @@
 import { Request, Response, NextFunction } from 'express'
-import { ExpenseService } from '../services/expenseService.js'
-import { DatabaseUtils } from '../utils/database.js'
+import { ExpenseService } from '../services/expenseService'
+import { DatabaseUtils } from '../utils/database'
 import {
     AuthenticatedRequest,
     CreateExpenseRequest,
     ApiError,
     ExpenseMonthlyResult
-} from '../types/index.js'
+} from '../types/index'
 import {
     sendErrorResponse,
     sendSuccessResponse,
     toNumber,
     isPositiveNumber
-} from '../utils/helper.js'
+} from '../utils/helper'
 
 /**
  * POST /api/expenses - Criar despesa
@@ -353,5 +353,59 @@ export const getExpensesByMonth = async (
     } catch (error) {
         console.error('Erro ao buscar despesas por mês:', error)
         sendErrorResponse(res, 'Erro ao buscar despesas por mês.', 500, error)
+    }
+}
+
+/**
+ * GET /api/expenses/resumo-categorias - Resumo de despesas por categoria
+ */
+export const getResumoCategorias = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+): Promise<void> => {
+    try {
+        const authReq = req as AuthenticatedRequest
+        const userId = authReq.user.id
+        const { mes, ano } = req.query
+
+        const month = toNumber(mes)
+        const year = toNumber(ano)
+
+        if (!month || !year || month < 1 || month > 12) {
+            sendErrorResponse(res, 'Parâmetros mes e ano são obrigatórios e devem ser válidos.', 400)
+            return
+        }
+
+        const result = await DatabaseUtils.query(
+            `SELECT 
+        c.nome,
+        c.cor,
+        COUNT(e.id) as quantidade,
+        SUM(e.quantidade) as total
+      FROM expenses e
+      JOIN categories c ON c.id = e.category_id
+      WHERE e.user_id = $1 
+        AND EXTRACT(MONTH FROM e.data) = $2 
+        AND EXTRACT(YEAR FROM e.data) = $3
+      GROUP BY c.nome, c.cor
+      ORDER BY total DESC`,
+            [userId, month, year]
+        )
+
+        const totalGeral = result.rows.reduce((acc: number, r: any) => acc + Number(r.total), 0)
+
+        const dados = result.rows.map((r: any) => ({
+            nome: r.nome,
+            cor: r.cor,
+            quantidade: Number(r.quantidade),
+            total: Number(r.total),
+            percentual: totalGeral > 0 ? (Number(r.total) / totalGeral) * 100 : 0,
+        }))
+
+        sendSuccessResponse(res, dados, 'Resumo de categorias recuperado com sucesso.')
+    } catch (error) {
+        console.error('Erro ao buscar resumo de categorias:', error)
+        sendErrorResponse(res, 'Erro ao buscar resumo de categorias.', 500, error)
     }
 }

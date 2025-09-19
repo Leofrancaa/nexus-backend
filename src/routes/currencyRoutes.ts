@@ -5,8 +5,8 @@ import {
     getSupportedCurrencies,
     convertCurrency,
     getFinancialSummary
-} from '../controllers/currencyController.js'
-import { authenticateToken } from '../middlewares/authMiddleware.js'
+} from '../controllers/currencyController'
+import { authenticateToken } from '../middlewares/authMiddleware'
 
 const router = Router()
 

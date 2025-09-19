@@ -1,5 +1,5 @@
 // src/utils/finance/getTopCategoriasGasto.ts
-import { DatabaseUtils } from '../database.js'
+import { DatabaseUtils } from '../database'
 
 interface TopCategoriasQueryResult {
     nome: string

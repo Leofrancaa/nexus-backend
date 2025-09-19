@@ -1,5 +1,5 @@
 // src/utils/finance/getComparativoMensal.ts
-import { DatabaseUtils } from '../database.js'
+import { DatabaseUtils } from '../database'
 
 interface TotalQueryResult {
     total: string

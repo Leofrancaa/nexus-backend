@@ -1,6 +1,6 @@
-import { pool } from '../database/index.js'
+import { pool } from '../database/index'
 import { QueryResult } from 'pg'
-import { createErrorResponse } from '../utils/helper.js'
+import { createErrorResponse } from '../utils/helper'
 
 type SupportedCurrency = 'BRL' | 'USD' | 'EUR' | 'GBP'
 

@@ -6,8 +6,8 @@ import {
     updateCategory,
     deleteCategory,
     getCategoryStats
-} from '../controllers/categoryController.js'
-import { authenticateToken } from '../middlewares/authMiddleware.js'
+} from '../controllers/categoryController'
+import { authenticateToken } from '../middlewares/authMiddleware'
 
 const router = Router()
 

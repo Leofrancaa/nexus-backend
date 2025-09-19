@@ -2,7 +2,7 @@ import { Request } from 'express'
 import { QueryResult as PgQueryResult } from 'pg'
 
 // Re-export tipos específicos do banco
-export * from './database.js'
+export * from './database'
 
 // ===== Database Query Result =====
 // Usar o tipo oficial do PostgreSQL em vez de criar o nosso próprio

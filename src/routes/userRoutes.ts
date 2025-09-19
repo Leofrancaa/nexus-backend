@@ -1,7 +1,7 @@
 import { Router } from 'express'
-import { AuthenticatedRequest } from '../types/index.js'
-import { authenticateToken } from '../middlewares/authMiddleware.js'
-import { sendSuccessResponse } from '../utils/helper.js'
+import { AuthenticatedRequest } from '../types/index'
+import { authenticateToken } from '../middlewares/authMiddleware'
+import { sendSuccessResponse } from '../utils/helper'
 import { Request, Response } from 'express'
 
 const router = Router()

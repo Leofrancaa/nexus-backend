@@ -1,15 +1,14 @@
-import { pool } from '../database/index.js'
+import { pool } from '../database/index'
 import { QueryResult } from 'pg'
 import {
     Category,
     CreateCategoryRequest,
-    ApiError
-} from '../types/index.js'
+} from '../types/index'
 import {
     createErrorResponse,
     isValidHexColor,
     sanitizeString
-} from '../utils/helper.js'
+} from '../utils/helper'
 
 export class CategoryService {
     /**

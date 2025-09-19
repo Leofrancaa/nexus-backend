@@ -1,12 +1,12 @@
-import { pool } from '../database/index.js'
+import { pool } from '../database/index'
 import { QueryResult } from 'pg'
 import {
     ApiError
-} from '../types/index.js'
+} from '../types/index'
 import {
     addMonthsSafe,
     createErrorResponse
-} from '../utils/helper.js'
+} from '../utils/helper'
 
 interface PayInvoiceParams {
     user_id: number

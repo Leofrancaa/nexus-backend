@@ -1,17 +1,14 @@
-import { pool } from '../database/index.js'
+import { pool } from '../database/index'
 import { QueryResult } from 'pg'
 import {
     Income,
     CreateIncomeRequest,
-    ApiError
-} from '../types/index.js'
+} from '../types/index'
 import {
     formatDate,
-    addMonthsSafe,
     getLastDayOfMonth,
     createErrorResponse
-} from '../utils/helper.js'
-import { DatabaseUtils } from '../utils/database.js'
+} from '../utils/helper'
 
 interface IncomeWithCategory extends Income {
     categoria_nome?: string

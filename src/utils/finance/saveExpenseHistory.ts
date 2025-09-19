@@ -1,5 +1,5 @@
 // src/utils/finance/saveExpenseHistory.ts
-import { DatabaseUtils } from '../database.js'
+import { DatabaseUtils } from '../database'
 
 interface SaveExpenseHistoryParams {
     expense_id: number

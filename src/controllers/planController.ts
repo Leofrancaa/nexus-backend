@@ -1,17 +1,17 @@
 import { Request, Response, NextFunction } from 'express'
-import { PlanService } from '../services/planService.js'
+import { PlanService } from '../services/planService'
 import {
     AuthenticatedRequest,
     CreatePlanRequest,
     ContributionRequest,
     ApiError
-} from '../types/index.js'
+} from '../types/index'
 import {
     sendErrorResponse,
     sendSuccessResponse,
     toNumber,
     isPositiveNumber
-} from '../utils/helper.js'
+} from '../utils/helper'
 
 /**
  * POST /api/plans - Criar plano
