@@ -1,11 +1,15 @@
 {
   "name": "nexus-backend",
   "version": "2.0.0",
-  "main": "dist/src/app.js",
+  "main": "dist/app.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/src/app.js",
-    "dev": "tsx watch src/app.ts"
+    "start": "node dist/app.js",
+    "dev": "tsx watch src/app.ts",
+    "dev:nodemon": "nodemon --exec tsx src/app.ts",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "postbuild": "ls -la dist/ || dir dist\\"
   },
   "keywords": [
     "finance",
