@@ -20,16 +20,45 @@ dotenv.config()
 
 const app: Application = express()
 
-// CORS Configuration
+// CORS Configuration - Versão para Deploy
 const corsOptions = {
-    origin: [
-        "http://localhost:3000",       // local dev
-        "http://10.88.80.40:3000",     // teste LAN
-        "https://nexus-frontend-liard-one.vercel.app" // front em produção
-    ],
-    credentials: false,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+        // Lista de origens permitidas
+        const allowedOrigins = [
+            "http://localhost:3000",       // desenvolvimento local
+            "http://10.88.80.40:3000",     // teste LAN
+            "https://nexus-frontend-3qz1y58xb-leofrancaas-projects.vercel.app", // produção atual
+            // Adicione outros domínios do Vercel conforme necessário
+            /\.vercel\.app$/,              // regex para qualquer subdomínio vercel
+            process.env.FRONTEND_URL       // variável de ambiente para flexibilidade
+        ].filter(Boolean) // remove valores undefined
+
+        // Permitir requests sem origin (ex: mobile apps, Postman)
+        if (!origin) return callback(null, true)
+
+        // Verificar se a origem está na lista permitida
+        const isAllowed = allowedOrigins.some(allowedOrigin => {
+            if (typeof allowedOrigin === 'string') {
+                return origin === allowedOrigin
+            }
+            // Para regex
+            if (allowedOrigin instanceof RegExp) {
+                return allowedOrigin.test(origin)
+            }
+            return false
+        })
+
+        if (isAllowed) {
+            callback(null, true)
+        } else {
+            console.warn(`🚫 CORS: Origem bloqueada: ${origin}`)
+            callback(new Error('Não permitido pelo CORS'), false)
+        }
+    },
+    credentials: true, // Mudei para true para cookies/auth
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    optionsSuccessStatus: 200 // Para suporte IE11
 }
 
 // Middlewares globais
@@ -112,6 +141,17 @@ app.use((error: Error, req: Request, res: Response, next: any): void => {
 
 // Inicialização do servidor
 const PORT = process.env.PORT || 3001
+
+// Melhor handling de errors não capturados
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('🚨 Unhandled Rejection at:', promise, 'reason:', reason)
+    // Em produção, você pode querer fazer graceful shutdown aqui
+})
+
+process.on('uncaughtException', (error) => {
+    console.error('🚨 Uncaught Exception:', error)
+    process.exit(1)
+})
 
 const startServer = async (): Promise<void> => {
     try {

@@ -5,10 +5,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/src/app.js",
-    "dev": "tsx watch src/app.ts",
-    "dev:nodemon": "nodemon --exec tsx src/app.ts",
-    "type-check": "tsc --noEmit",
-    "clean": "rmdir /s /q dist"
+    "dev": "tsx watch src/app.ts"
   },
   "keywords": [
     "finance",
