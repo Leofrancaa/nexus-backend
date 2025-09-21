@@ -1,58 +1,46 @@
-// src/database/index.ts - CONFIGURAÇÃO PARA VERCEL
+import { Pool, PoolConfig } from 'pg'
+import dotenv from 'dotenv'
 
-import { Pool } from 'pg'
+dotenv.config()
 
-// Verificar se DATABASE_URL está configurada
-if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL environment variable is not set')
+const poolConfig: PoolConfig = {
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    max: 20, // máximo de conexões no pool
+    idleTimeoutMillis: 30000, // tempo limite para conexões ociosas
+    connectionTimeoutMillis: 10000, // tempo limite para estabelecer conexão
 }
 
-// Log para debug (remover depois)
-console.log('DATABASE_URL configured:', process.env.DATABASE_URL.substring(0, 20) + '...')
+export const pool = new Pool(poolConfig)
 
-// Pool configurado para Vercel (serverless)
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? {
-        rejectUnauthorized: false
-    } : false,
-    // Configurações específicas para serverless
-    max: 1, // Máximo 1 conexão por instância serverless
-    idleTimeoutMillis: 0,
-    connectionTimeoutMillis: 10000, // 10 segundos timeout
-    statement_timeout: 30000, // 30 segundos para queries
-    query_timeout: 30000,
+// Event listeners para monitoramento
+pool.on('connect', (client) => {
+    console.log('🔗 Nova conexão estabelecida com o banco de dados')
 })
 
-// Função de teste de conexão
+pool.on('error', (err) => {
+    console.error('❌ Erro inesperado no pool de conexões:', err)
+    process.exit(-1)
+})
+
+// Função para testar a conexão
 export const testConnection = async (): Promise<boolean> => {
     try {
-        console.log('Testing database connection...')
         const client = await pool.connect()
-        const result = await client.query('SELECT NOW() as current_time, version() as postgres_version')
+        const result = await client.query('SELECT NOW()')
         client.release()
-
-        console.log('✅ Database connected successfully:', {
-            time: result.rows[0].current_time,
-            version: result.rows[0].postgres_version.substring(0, 50) + '...'
-        })
-
+        console.log('✅ Conexão com banco de dados testada com sucesso:', result.rows[0].now)
         return true
     } catch (error) {
-        console.error('❌ Database connection failed:', {
-            message: error instanceof Error ? error.message : 'Unknown error',
-            code: (error as any)?.code,
-            address: (error as any)?.address,
-            port: (error as any)?.port
-        })
+        console.error('❌ Erro ao conectar com o banco de dados:', error)
         return false
     }
 }
 
-// Graceful shutdown para serverless
-process.on('beforeExit', () => {
-    console.log('Closing database pool...')
-    pool.end()
-})
+// Função para fechar todas as conexões (útil para testes)
+export const closePool = async (): Promise<void> => {
+    await pool.end()
+    console.log('🔚 Pool de conexões fechado')
+}
 
-export { pool }
+export default pool
