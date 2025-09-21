@@ -59,7 +59,20 @@ app.use('/api/plans', planRoutes)
 // Health check
 app.get('/ping', async (req: Request, res: Response): Promise<void> => {
     try {
-        const result = await pool.query('SELECT NOW() as current_time')
+        console.log('Testing database connection...')
+
+        // Teste simples sem pool existente
+        const { Pool } = require('pg')
+        const testPool = new Pool({
+            connectionString: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: false },
+            max: 1,
+            connectionTimeoutMillis: 10000
+        })
+
+        const result = await testPool.query('SELECT NOW() as current_time')
+        await testPool.end()
+
         res.status(200).json({
             status: 'OK',
             message: 'Banco conectado!',
@@ -67,10 +80,16 @@ app.get('/ping', async (req: Request, res: Response): Promise<void> => {
             timestamp: new Date().toISOString()
         })
     } catch (error) {
-        console.error('Erro ao conectar no banco:', error)
+        console.error('Database error:', error)
         res.status(500).json({
             status: 'ERROR',
-            message: 'Erro ao conectar no banco de dados.'
+            message: 'Erro ao conectar no banco de dados.',
+            error: {
+                message: (error as any)?.message,
+                code: (error as any)?.code,
+                address: (error as any)?.address,
+                port: (error as any)?.port
+            }
         })
     }
 })
@@ -95,6 +114,18 @@ app.get('/', (req: Request, res: Response): void => {
             auth: '/auth',
             api: '/api'
         }
+    })
+})
+
+// Adicione este endpoint simples no src/app.ts:
+
+app.get('/test-env', (req: Request, res: Response) => {
+    res.json({
+        DATABASE_URL: process.env.DATABASE_URL ? 'CONFIGURED' : 'NOT SET',
+        DATABASE_URL_preview: process.env.DATABASE_URL ?
+            process.env.DATABASE_URL.substring(0, 30) + '...' : 'N/A',
+        NODE_ENV: process.env.NODE_ENV,
+        timestamp: new Date().toISOString()
     })
 })
 
