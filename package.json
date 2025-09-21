@@ -1,15 +1,13 @@
 {
   "name": "nexus-backend",
   "version": "2.0.0",
-  "main": "src/app.ts",
+  "main": "dist/app.js",
   "scripts": {
-    "build": "echo 'Build completed - using tsx for production'",
-    "start": "npx tsx src/app.ts",
+    "build": "tsc",
+    "start": "node dist/app.js",
     "dev": "tsx watch src/app.ts",
-    "dev:nodemon": "nodemon --exec tsx src/app.ts",
     "type-check": "tsc --noEmit",
-    "build:compile": "tsc && ls -la dist/",
-    "start:compiled": "node dist/app.js"
+    "clean": "rm -rf dist"
   },
   "keywords": [
     "finance",
@@ -29,7 +27,7 @@
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.11.3",
     "yahoo-finance2": "^2.11.3",
-    "tsx": "^4.6.2"
+    "typescript": "^5.3.3"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
@@ -38,8 +36,7 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/node": "^20.10.5",
     "@types/pg": "^8.10.9",
-    "nodemon": "^3.0.2",
-    "typescript": "^5.3.3"
+    "tsx": "^4.6.2"
   },
   "engines": {
     "node": ">=18.0.0"
