@@ -214,6 +214,7 @@ export const getTotalByCategory = async (
         }
 
         const total = await ExpenseService.getTotalByCategory(userId, categoryId, month, year)
+
         sendSuccessResponse(res, { total }, 'Total da categoria recuperado com sucesso.')
     } catch (error) {
         console.error('Erro ao buscar total da categoria:', error)

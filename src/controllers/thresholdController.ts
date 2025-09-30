@@ -188,6 +188,7 @@ export const getThresholdAlerts = async (
         const userId = authReq.user.id
         const { month, year } = req.query
 
+
         const parsedMonth = month ? toNumber(month) : undefined
         const parsedYear = year ? toNumber(year) : undefined
 

@@ -4,8 +4,8 @@
   "main": "api/index.ts",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/app.js",
-    "dev": "tsx watch src/app.ts",
+    "start": "node dist/src/app.js",
+    "dev": "tsx watch api/index.ts",
     "vercel-build": "echo 'Building for Vercel...'",
     "type-check": "tsc --noEmit"
   },

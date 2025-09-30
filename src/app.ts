@@ -139,11 +139,11 @@ app.use('*', (req: Request, res: Response): void => {
 
 // Não usar app.listen no Vercel (serverless)
 // Para desenvolvimento local, descomente:
-// if (process.env.NODE_ENV !== 'production') {
-//     const PORT = process.env.PORT || 3001
-//     app.listen(PORT, () => {
-//         console.log(`🚀 Servidor rodando na porta ${PORT}`)
-//     })
-// }
+if (process.env.NODE_ENV !== 'production') {
+    const PORT = process.env.PORT || 3001
+    app.listen(PORT, () => {
+        console.log(`🚀 Servidor rodando na porta ${PORT}`)
+    })
+}
 
 export default app

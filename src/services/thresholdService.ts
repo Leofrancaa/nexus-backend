@@ -41,6 +41,7 @@ export class ThresholdService {
     ): Promise<Threshold> {
         const { category_id, valor } = thresholdData
 
+
         // Validações
         if (!category_id || !isPositiveNumber(valor)) {
             throw createErrorResponse("Category ID e valor positivo são obrigatórios.", 400)
@@ -217,7 +218,7 @@ export class ThresholdService {
         const targetYear = year || now.getFullYear()
 
         const result = await pool.query(
-            `SELECT 
+            `SELECT
         t.id as threshold_id,
         t.valor as limit_value,
         c.nome as category_name,
@@ -225,7 +226,7 @@ export class ThresholdService {
         COALESCE(SUM(e.quantidade), 0) as current_spending
       FROM thresholds t
       JOIN categories c ON t.category_id = c.id
-      LEFT JOIN expenses e ON e.category_id = t.category_id 
+      LEFT JOIN expenses e ON e.category_id = t.category_id
         AND e.user_id = t.user_id
         AND EXTRACT(MONTH FROM e.data) = $2
         AND EXTRACT(YEAR FROM e.data) = $3
@@ -234,6 +235,7 @@ export class ThresholdService {
       ORDER BY c.nome`,
             [userId, targetMonth, targetYear]
         )
+
 
         return result.rows.map(row => {
             const limitValue = Number(row.limit_value)
@@ -251,7 +253,7 @@ export class ThresholdService {
                 alertLevel = 'warning'
             }
 
-            return {
+            const alertResult = {
                 threshold_id: row.threshold_id,
                 category_name: row.category_name,
                 category_color: row.category_color,
@@ -262,6 +264,8 @@ export class ThresholdService {
                 is_exceeded: isExceeded,
                 alert_level: alertLevel
             }
+
+            return alertResult
         })
     }
 
