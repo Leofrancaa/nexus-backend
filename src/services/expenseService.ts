@@ -131,7 +131,7 @@ export class ExpenseService {
             )
         }
 
-        // Despesa única no cartão
+        // Despesa única ou fixa no cartão
         const comp = calculateCompetencia(baseDate, card.dia_vencimento, card.dias_fechamento_antes)
 
         // Verificar se a competência já foi paga
@@ -148,7 +148,7 @@ export class ExpenseService {
                 expenseData.metodo_pagamento,
                 tipo,
                 quantidade,
-                false,
+                expenseData.fixo || false,
                 expenseData.data,
                 parcelas,
                 expenseData.frequencia,
@@ -161,13 +161,29 @@ export class ExpenseService {
             ]
         )
 
-        // Reduzir limite disponível
-        await pool.query(
-            `UPDATE cards SET limite_disponivel = limite_disponivel - $1 WHERE id = $2`,
-            [quantidade, card_id]
-        )
+        const baseExpense = result.rows[0]
 
-        return result.rows[0]
+        // Para despesas únicas, reduzir limite disponível imediatamente
+        // Para despesas fixas (assinaturas), não descontamos o limite antecipadamente
+        if (!expenseData.fixo) {
+            await pool.query(
+                `UPDATE cards SET limite_disponivel = limite_disponivel - $1 WHERE id = $2`,
+                [quantidade, card_id]
+            )
+        }
+
+        // Se é despesa fixa no cartão, replicar até dezembro
+        if (expenseData.fixo) {
+            await this.replicateFixedCreditCardExpense(
+                baseExpense,
+                baseDate,
+                userId,
+                card.dia_vencimento,
+                card.dias_fechamento_antes
+            )
+        }
+
+        return baseExpense
     }
 
     /**
@@ -253,6 +269,74 @@ export class ExpenseService {
     }
 
     /**
+     * Replica despesa fixa no cartão de crédito até dezembro
+     */
+    private static async replicateFixedCreditCardExpense(
+        baseExpense: Expense,
+        baseDate: Date,
+        userId: number,
+        diaVencimento: number,
+        diasFechamentoAntes: number
+    ): Promise<void> {
+        const diaOriginal = baseDate.getDate()
+        const mesOriginal = baseDate.getMonth()
+        const ano = baseDate.getFullYear()
+        // Só considera "último dia do mês" se for dia 31, para evitar que dia 30 replique para 31
+        const ehUltimoDiaMes = diaOriginal === 31
+
+        for (let mes = mesOriginal + 1; mes <= 11; mes++) {
+            const diasNoMesAlvo = new Date(ano, mes + 1, 0).getDate()
+
+            let diaParaInserir: number
+            if (ehUltimoDiaMes) {
+                diaParaInserir = diasNoMesAlvo
+            } else {
+                diaParaInserir = Math.min(diaOriginal, diasNoMesAlvo)
+            }
+
+            const novaData = new Date(ano, mes, diaParaInserir)
+            const dataRep = `${ano}-${String(mes + 1).padStart(2, "0")}-${String(diaParaInserir).padStart(2, "0")}`
+
+            // Calcular competência para a nova data
+            const comp = calculateCompetencia(novaData, diaVencimento, diasFechamentoAntes)
+
+            // Verificar se a fatura já foi paga
+            try {
+                await this.checkIfInvoicePaid(userId, baseExpense.card_id!, comp.competencia_mes, comp.competencia_ano)
+            } catch (error) {
+                // Se a fatura já foi paga, pular este mês
+                continue
+            }
+
+            await pool.query(
+                `INSERT INTO expenses (
+                    metodo_pagamento, tipo, quantidade, fixo, data,
+                    parcelas, frequencia, user_id, card_id, category_id, observacoes,
+                    competencia_mes, competencia_ano
+                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+                [
+                    baseExpense.metodo_pagamento,
+                    baseExpense.tipo,
+                    baseExpense.quantidade,
+                    true,
+                    dataRep,
+                    baseExpense.parcelas,
+                    baseExpense.frequencia,
+                    userId,
+                    baseExpense.card_id,
+                    baseExpense.category_id,
+                    baseExpense.observacoes,
+                    comp.competencia_mes,
+                    comp.competencia_ano,
+                ]
+            )
+
+            // Para despesas fixas, não descontamos o limite antecipadamente
+            // O limite será descontado quando a fatura for gerada/fechada
+        }
+    }
+
+    /**
      * Replica despesa fixa até dezembro
      */
     private static async replicateFixedExpense(
@@ -264,7 +348,8 @@ export class ExpenseService {
         const mesOriginal = baseDate.getMonth()
         const ano = baseDate.getFullYear()
         const diasNoMesOriginal = new Date(ano, mesOriginal + 1, 0).getDate()
-        const ehUltimoDiaMes = diaOriginal === diasNoMesOriginal
+        // Só considera "último dia do mês" se for dia 31, para evitar que dia 30 replique para 31
+        const ehUltimoDiaMes = diaOriginal === 31
 
         for (let mes = mesOriginal + 1; mes <= 11; mes++) {
             const diasNoMesAlvo = new Date(ano, mes + 1, 0).getDate()
@@ -456,30 +541,39 @@ export class ExpenseService {
         userId: number,
         month: number,
         year: number
-    ): Promise<Array<{ id: number; nome: string; total: number; cor: string }>> {
-        const result = await pool.query(
-            `SELECT 
+    ): Promise<Array<{ id: number; nome: string; cor: string; quantidade: number; total: number; percentual: number }>> {
+        const result: QueryResult<{
+            id: number
+            nome: string
+            cor: string
+            quantidade: string
+            total: string
+        }> = await pool.query(
+            `SELECT
                 c.id,
                 c.nome,
                 c.cor,
-                COALESCE(SUM(e.quantidade), 0) as total
-             FROM categories c
-             LEFT JOIN expenses e ON c.id = e.category_id
-               AND e.user_id = $1
+                COUNT(e.id) as quantidade,
+                SUM(e.quantidade) as total
+             FROM expenses e
+             JOIN categories c ON c.id = e.category_id
+             WHERE e.user_id = $1
                AND EXTRACT(MONTH FROM e.data) = $2
                AND EXTRACT(YEAR FROM e.data) = $3
-             WHERE c.user_id = $1 AND c.tipo = 'despesa'
              GROUP BY c.id, c.nome, c.cor
-             HAVING COALESCE(SUM(e.quantidade), 0) > 0
              ORDER BY total DESC`,
             [userId, month, year]
         )
 
+        const totalGeral = result.rows.reduce((acc, r) => acc + Number(r.total), 0)
+
         return result.rows.map(row => ({
             id: row.id,
             nome: row.nome,
+            cor: row.cor,
+            quantidade: Number(row.quantidade),
             total: Number(row.total),
-            cor: row.cor
+            percentual: totalGeral > 0 ? (Number(row.total) / totalGeral) * 100 : 0
         }))
     }
 
@@ -601,20 +695,23 @@ export class ExpenseService {
         // Se for despesa fixa, deletar todas as replicações futuras
         if (expense.fixo) {
             const deletedExpenses: QueryResult<Expense> = await pool.query(
-                `DELETE FROM expenses 
-                 WHERE user_id = $1 
-                   AND tipo = $2 
-                   AND quantidade = $3 
-                   AND fixo = true 
+                `DELETE FROM expenses
+                 WHERE user_id = $1
+                   AND tipo = $2
+                   AND quantidade = $3
+                   AND fixo = true
                    AND data >= $4
                  RETURNING *`,
                 [userId, expense.tipo, expense.quantidade, expense.data]
             )
 
+            // Para despesas fixas no cartão, não restauramos o limite
+            // pois nunca foi descontado antecipadamente (assinaturas)
+
             return deletedExpenses.rows
         }
 
-        // Se for despesa no cartão, restaurar limite
+        // Se for despesa única no cartão, restaurar limite
         const metodoNorm = normalize(expense.metodo_pagamento)
         if (metodoNorm.includes("credito") && expense.card_id) {
             await pool.query(

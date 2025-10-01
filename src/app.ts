@@ -9,6 +9,7 @@ import incomeRoutes from './routes/incomeRoutes'
 import cardRoutes from './routes/cardRoutes'
 import categoryRoutes from './routes/categoryRoutes'
 import thresholdRoutes from './routes/thresholdRoutes'
+import goalRoutes from './routes/goalRoutes'
 import dashboardRoutes from './routes/dashboardRoutes'
 import userRoutes from './routes/userRoutes'
 import currencyRoutes from './routes/currencyRoutes'
@@ -50,6 +51,7 @@ app.use('/api/incomes', incomeRoutes)
 app.use('/api/cards', cardRoutes)
 app.use('/api/categories', categoryRoutes)
 app.use('/api/thresholds', thresholdRoutes)
+app.use('/api/goals', goalRoutes)
 app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/users', currencyRoutes)
 app.use('/api', userRoutes)

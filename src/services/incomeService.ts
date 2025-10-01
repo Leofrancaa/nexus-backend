@@ -87,8 +87,8 @@ export class IncomeService {
         const diaOriginal = baseDate.getDate()
         const mesOriginal = baseDate.getMonth()
         const ano = baseDate.getFullYear()
-        const ultimoDiaDoMesOriginal = getLastDayOfMonth(baseDate)
-        const ehUltimoDiaMes = diaOriginal === ultimoDiaDoMesOriginal
+        // Só considera "último dia do mês" se for dia 31, para evitar que dia 30 replique para 31
+        const ehUltimoDiaMes = diaOriginal === 31
 
         const replicatedIncomes: Income[] = []
 

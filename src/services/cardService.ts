@@ -75,29 +75,57 @@ export class CardService {
      * Busca todos os cartões do usuário
      */
     static async getCardsByUser(userId: number): Promise<CardWithStats[]> {
-        const result: QueryResult<CardWithStats> = await pool.query(
-            `SELECT 
+        const currentMonth = new Date().getMonth() + 1
+        const currentYear = new Date().getFullYear()
+
+        console.log('[getCardsByUser] Buscando cartões para:', { userId, currentMonth, currentYear })
+
+        const result: QueryResult<CardWithStats & { gasto_fixo: string }> = await pool.query(
+            `SELECT
         c.*,
         COALESCE(SUM(e.quantidade), 0) AS gasto_total,
+        COALESCE(SUM(CASE WHEN e.fixo = true THEN e.quantidade ELSE 0 END), 0) AS gasto_fixo,
         CASE
           WHEN CURRENT_DATE <= make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int, EXTRACT(MONTH FROM CURRENT_DATE)::int, c.dia_vencimento)
           THEN make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int, EXTRACT(MONTH FROM CURRENT_DATE)::int, c.dia_vencimento)
           ELSE make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int, EXTRACT(MONTH FROM CURRENT_DATE)::int + 1, c.dia_vencimento)
         END AS proximo_vencimento
      FROM cards c
-     LEFT JOIN expenses e ON e.card_id = c.id AND e.user_id = $1
+     LEFT JOIN expenses e ON e.card_id = c.id
+       AND e.user_id = $1
+       AND (e.competencia_mes = $2 AND e.competencia_ano = $3)
      WHERE c.user_id = $1
      GROUP BY c.id
      ORDER BY c.id DESC`,
-            [userId]
+            [userId, currentMonth, currentYear]
         )
 
-        return result.rows.map(card => ({
-            ...card,
-            limite: Number(card.limite),
-            limite_disponivel: Number(card.limite_disponivel),
-            gasto_total: Number(card.gasto_total),
-        }))
+        console.log('[getCardsByUser] Resultado:', result.rows.map(r => ({
+            id: r.id,
+            nome: r.nome,
+            gasto_total: r.gasto_total,
+            gasto_fixo: r.gasto_fixo,
+            limite_disponivel_banco: r.limite_disponivel
+        })))
+
+        return result.rows.map(card => {
+            const limite = Number(card.limite)
+            const gastoTotal = Number(card.gasto_total)
+            const gastoFixo = Number(card.gasto_fixo)
+            const limiteDisponvelBanco = Number(card.limite_disponivel)
+
+            // Limite disponível = limite do banco (já descontadas parceladas/únicas) - despesas fixas da competência atual
+            const limiteDisponivel = limiteDisponvelBanco - gastoFixo
+
+            console.log(`[getCardsByUser] Card ${card.nome}: limite=${limite}, limite_banco=${limiteDisponvelBanco}, gasto_fixo=${gastoFixo}, resultado=${limiteDisponivel}`)
+
+            return {
+                ...card,
+                limite,
+                limite_disponivel: limiteDisponivel,
+                gasto_total: gastoTotal,
+            }
+        })
     }
 
     /**
