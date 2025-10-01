@@ -1,2 +1,3 @@
-// Crie este arquivo em: api/index.ts
-import '../src/app'
+import app from '../src/app'
+
+export default app
