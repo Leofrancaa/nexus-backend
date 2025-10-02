@@ -520,6 +520,13 @@ export class PlanService {
             const totalContribuido = Number(plan.total_contribuido)
             const progresso = meta > 0 ? (totalContribuido / meta) * 100 : 0
 
+            console.log('[calculatePlanProgress] Valores:', {
+                planId: plan.id,
+                meta,
+                totalContribuido,
+                progressoCalculado: progresso
+            })
+
             // Calcular dias restantes
             const prazoDate = new Date(`${plan.prazo}T23:59:59`)
             const now = new Date()
