@@ -39,8 +39,8 @@ export class ExpenseService {
             observacoes,
         } = expenseData
 
-        const baseDate = data ? new Date(`${data}T00:00:00`) : new Date()
-        const formattedBaseDate = formatDate(baseDate)
+        // Usar a data diretamente sem conversão de timezone
+        const formattedBaseDate = data || formatDate(new Date())
 
         const metodoNorm = normalize(metodo_pagamento)
         const isCreditCard = metodoNorm.includes("credito") && card_id && !isNaN(Number(card_id))
@@ -50,7 +50,7 @@ export class ExpenseService {
             return await this.handleCreditCardExpense({
                 ...expenseData,
                 data: formattedBaseDate
-            }, userId, baseDate)
+            }, userId, formattedBaseDate)
         }
 
         /* ===================== DESPESA COMUM ===================== */
@@ -79,7 +79,7 @@ export class ExpenseService {
 
         // Replicar despesa fixa até dezembro
         if (fixo) {
-            await this.replicateFixedExpense(baseExpense, baseDate, userId)
+            await this.replicateFixedExpense(baseExpense, formattedBaseDate, userId)
         }
 
         return baseExpense
@@ -91,8 +91,10 @@ export class ExpenseService {
     private static async handleCreditCardExpense(
         expenseData: CreateExpenseRequest & { data: string },
         userId: number,
-        baseDate: Date
+        baseDateString: string
     ): Promise<Expense | Expense[]> {
+        // Criar Date object apenas para cálculos internos, usando meio-dia para evitar timezone issues
+        const baseDate = new Date(`${baseDateString}T12:00:00`)
         const { card_id, quantidade, parcelas, tipo } = expenseData
 
         // Buscar dados do cartão
@@ -341,9 +343,11 @@ export class ExpenseService {
      */
     private static async replicateFixedExpense(
         baseExpense: Expense,
-        baseDate: Date,
+        baseDateString: string,
         userId: number
     ): Promise<void> {
+        // Criar Date object usando meio-dia para evitar timezone issues
+        const baseDate = new Date(`${baseDateString}T12:00:00`)
         const diaOriginal = baseDate.getDate()
         const mesOriginal = baseDate.getMonth()
         const ano = baseDate.getFullYear()

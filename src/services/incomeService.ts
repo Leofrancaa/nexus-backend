@@ -40,8 +40,8 @@ export class IncomeService {
             category_id
         } = incomeData
 
-        const baseDate = data ? new Date(`${data}T00:00:00`) : new Date()
-        const formattedBaseDate = formatDate(baseDate)
+        // Usar a data diretamente sem conversão de timezone
+        const formattedBaseDate = data || formatDate(new Date())
 
         // Criar receita base
         const result: QueryResult<Income> = await pool.query(
@@ -67,7 +67,7 @@ export class IncomeService {
         if (fixo) {
             const replicatedIncomes = await this.replicateFixedIncome(
                 baseIncome,
-                baseDate,
+                formattedBaseDate,
                 userId
             )
             return [baseIncome, ...replicatedIncomes]
@@ -81,9 +81,11 @@ export class IncomeService {
      */
     private static async replicateFixedIncome(
         baseIncome: Income,
-        baseDate: Date,
+        baseDateString: string,
         userId: number
     ): Promise<Income[]> {
+        // Criar Date object usando meio-dia para evitar timezone issues
+        const baseDate = new Date(`${baseDateString}T12:00:00`)
         const diaOriginal = baseDate.getDate()
         const mesOriginal = baseDate.getMonth()
         const ano = baseDate.getFullYear()
