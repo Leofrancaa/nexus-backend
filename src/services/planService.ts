@@ -410,15 +410,13 @@ export class PlanService {
             }
 
             const result: QueryResult<PlanContribution> = await pool.query(
-                `SELECT 
-                    id, 
-                    plan_id, 
-                    user_id, 
-                    valor, 
-                    created_at
+                `SELECT
+                    id,
+                    plan_id,
+                    user_id,
+                    valor
                  FROM plan_contributions
                  WHERE plan_id = $1 AND user_id = $2
-                 ORDER BY created_at DESC
                  LIMIT $3`,
                 [planId, userId, limit]
             )
@@ -534,10 +532,9 @@ export class PlanService {
 
             // Buscar estatísticas de contribuições
             const statsResult = await pool.query(
-                `SELECT 
+                `SELECT
                     COUNT(*) as contributions_count,
-                    COALESCE(AVG(valor), 0) as average_contribution,
-                    MAX(created_at) as last_contribution_date
+                    COALESCE(AVG(valor), 0) as average_contribution
                  FROM plan_contributions
                  WHERE plan_id = $1`,
                 [plan.id]
@@ -555,7 +552,7 @@ export class PlanService {
                 is_overdue: diasRestantes < 0 && progresso < 100,
                 contributions_count: Number(stats.contributions_count || 0),
                 average_contribution: Number(stats.average_contribution || 0),
-                last_contribution_date: stats.last_contribution_date || null
+                last_contribution_date: null
             }
 
             console.log('[calculatePlanProgress] Progresso calculado:', {
