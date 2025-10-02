@@ -9,7 +9,8 @@ import {
     sendErrorResponse,
     sendSuccessResponse,
     toNumber,
-    isPositiveNumber
+    isPositiveNumber,
+    formatDatesInObject
 } from '../utils/helper'
 
 /**
@@ -42,7 +43,7 @@ export const createIncome = async (
             ? `${result.length} receitas criadas com sucesso (receita fixa replicada).`
             : 'Receita criada com sucesso.'
 
-        sendSuccessResponse(res, result, message, 201)
+        const formatted = Array.isArray(result) ? result.map(formatDatesInObject) : formatDatesInObject(result); sendSuccessResponse(res, formatted, message, 201)
     } catch (error) {
         console.error('Erro ao criar receita:', error)
 
@@ -80,7 +81,7 @@ export const getIncomes = async (
             }
 
             const incomes = await IncomeService.getIncomesByMonthYear(userId, month, year)
-            sendSuccessResponse(res, incomes, 'Receitas recuperadas com sucesso.')
+            sendSuccessResponse(res, incomes.map(formatDatesInObject), 'Receitas recuperadas com sucesso.')
             return
         }
 
@@ -96,7 +97,7 @@ export const getIncomes = async (
             end_date as string
         )
 
-        sendSuccessResponse(res, incomes, 'Receitas recuperadas com sucesso.')
+        sendSuccessResponse(res, incomes.map(formatDatesInObject), 'Receitas recuperadas com sucesso.')
     } catch (error) {
         console.error('Erro ao buscar receitas:', error)
         sendErrorResponse(res, 'Erro ao buscar receitas.', 500, error)
@@ -129,7 +130,7 @@ export const updateIncome = async (
         }
 
         const updatedIncome = await IncomeService.updateIncome(incomeId, updateData, userId)
-        sendSuccessResponse(res, updatedIncome, 'Receita atualizada com sucesso.')
+        sendSuccessResponse(res, formatDatesInObject(updatedIncome), 'Receita atualizada com sucesso.')
     } catch (error) {
         console.error('Erro ao atualizar receita:', error)
 
@@ -310,7 +311,7 @@ export const getIncomesByMonth = async (
         const userId = authReq.user.id
 
         const result = await IncomeService.getIncomesGroupedByMonth(userId)
-        sendSuccessResponse(res, result, 'Receitas por mês recuperadas com sucesso.')
+        const formatted = Array.isArray(result) ? result.map(formatDatesInObject) : formatDatesInObject(result); sendSuccessResponse(res, formatted, 'Receitas por mês recuperadas com sucesso.')
     } catch (error) {
         console.error('Erro ao buscar receitas por mês:', error)
         sendErrorResponse(res, 'Erro ao buscar receitas por mês.', 500, error)

@@ -12,7 +12,8 @@ import {
     sendErrorResponse,
     sendSuccessResponse,
     toNumber,
-    isPositiveNumber
+    isPositiveNumber,
+    formatDatesInObject
 } from '../utils/helper'
 
 /**
@@ -41,9 +42,14 @@ export const createExpense = async (
 
         const result = await ExpenseService.createExpense(expenseData, userId)
 
+        // Formatar datas antes de enviar
+        const formattedResult = Array.isArray(result)
+            ? result.map(formatDatesInObject)
+            : formatDatesInObject(result)
+
         sendSuccessResponse(
             res,
-            result,
+            formattedResult,
             Array.isArray(result) ? 'Despesas criadas com sucesso.' : 'Despesa criada com sucesso.',
             201
         )
@@ -84,7 +90,8 @@ export const getExpenses = async (
             }
 
             const expenses = await ExpenseService.getExpensesByMonthYear(userId, month, year)
-            sendSuccessResponse(res, expenses, 'Despesas recuperadas com sucesso.')
+            const formattedExpenses = expenses.map(formatDatesInObject)
+            sendSuccessResponse(res, formattedExpenses, 'Despesas recuperadas com sucesso.')
             return
         }
 
@@ -100,7 +107,8 @@ export const getExpenses = async (
             end_date as string
         )
 
-        sendSuccessResponse(res, expenses, 'Despesas recuperadas com sucesso.')
+        const formattedExpenses = expenses.map(formatDatesInObject)
+        sendSuccessResponse(res, formattedExpenses, 'Despesas recuperadas com sucesso.')
     } catch (error) {
         console.error('Erro ao buscar despesas:', error)
         sendErrorResponse(res, 'Erro ao buscar despesas.', 500, error)
@@ -133,7 +141,8 @@ export const updateExpense = async (
         }
 
         const updatedExpense = await ExpenseService.updateExpense(expenseId, updateData, userId)
-        sendSuccessResponse(res, updatedExpense, 'Despesa atualizada com sucesso.')
+        const formattedExpense = formatDatesInObject(updatedExpense)
+        sendSuccessResponse(res, formattedExpense, 'Despesa atualizada com sucesso.')
     } catch (error) {
         console.error('Erro ao atualizar despesa:', error)
 

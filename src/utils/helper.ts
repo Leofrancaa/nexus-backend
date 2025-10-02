@@ -37,6 +37,40 @@ export const formatDate = (date: Date): string => {
 }
 
 /**
+ * Formata uma data retornada do banco (timestamp ou string) para YYYY-MM-DD
+ * Evita problemas de timezone ao extrair apenas a parte da data
+ */
+export const formatDateFromDB = (dateValue: string | Date | null): string => {
+    if (!dateValue) return ''
+
+    // Se já é string, extrair apenas YYYY-MM-DD
+    if (typeof dateValue === 'string') {
+        return dateValue.split('T')[0].split(' ')[0]
+    }
+
+    // Se é Date object, formatar
+    return formatDate(dateValue)
+}
+
+/**
+ * Formata todas as datas de um objeto do banco
+ */
+export const formatDatesInObject = <T extends Record<string, any>>(obj: T): T => {
+    const formatted = { ...obj }
+
+    // Campos de data conhecidos que devem ser formatados
+    const dateFields = ['data', 'prazo', 'created_at', 'updated_at']
+
+    for (const field of dateFields) {
+        if (formatted[field]) {
+            formatted[field] = formatDateFromDB(formatted[field])
+        }
+    }
+
+    return formatted
+}
+
+/**
  * Valida se uma string é um email válido
  */
 export const isValidEmail = (email: string): boolean => {
