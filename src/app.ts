@@ -25,6 +25,7 @@ const allowedOrigins: (string | RegExp)[] = [
     "http://localhost:3000",
     "http://10.88.80.40:3000",
     "https://nexus-frontend-virid.vercel.app",
+    "https://nexus-fintool.vercel.app",
     /\.vercel\.app$/
 ]
 
