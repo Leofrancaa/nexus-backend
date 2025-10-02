@@ -80,7 +80,7 @@ export const registerUser = async (req: Request<{}, AuthResponse, RegisterReques
 
         // Gerar token JWT (24 horas de validade)
         const token = jwt.sign(
-            { id: user.id, email: user.email },
+            { id: user.id, nome: user.nome, email: user.email },
             JWT_SECRET,
             { expiresIn: '24h' }
         )
@@ -178,7 +178,7 @@ export const loginUser = async (req: Request<{}, AuthResponse, LoginRequest>, re
 
         // Gerar token JWT (24 horas de validade)
         const token = jwt.sign(
-            { id: user.id, email: user.email },
+            { id: user.id, nome: user.nome, email: user.email },
             JWT_SECRET,
             { expiresIn: '24h' }
         )
