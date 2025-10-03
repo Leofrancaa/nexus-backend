@@ -70,10 +70,10 @@ export const registerUser = async (req: Request<{}, AuthResponse, RegisterReques
 
         // Inserir usuário
         const result: QueryResult<Omit<User, 'senha'>> = await pool.query(
-            `INSERT INTO users (nome, email, senha, currency) 
-       VALUES ($1, $2, $3, $4) 
+            `INSERT INTO users (nome, email, senha, currency, accepted_terms, accepted_terms_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
        RETURNING id, nome, email, currency, created_at, updated_at`,
-            [nome, email.toLowerCase(), hashedPassword, 'BRL']
+            [nome, email.toLowerCase(), hashedPassword, 'BRL', true]
         )
 
         const user = result.rows[0]
