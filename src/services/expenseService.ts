@@ -554,17 +554,18 @@ export class ExpenseService {
             total: string
         }> = await pool.query(
             `SELECT
-                c.id,
-                c.nome,
-                c.cor,
+                COALESCE(parent.id, c.id) as id,
+                COALESCE(parent.nome, c.nome) as nome,
+                COALESCE(parent.cor, c.cor) as cor,
                 COUNT(e.id) as quantidade,
                 SUM(e.quantidade) as total
              FROM expenses e
              JOIN categories c ON c.id = e.category_id
+             LEFT JOIN categories parent ON parent.id = c.parent_id
              WHERE e.user_id = $1
                AND EXTRACT(MONTH FROM e.data) = $2
                AND EXTRACT(YEAR FROM e.data) = $3
-             GROUP BY c.id, c.nome, c.cor
+             GROUP BY COALESCE(parent.id, c.id), COALESCE(parent.nome, c.nome), COALESCE(parent.cor, c.cor)
              ORDER BY total DESC`,
             [userId, month, year]
         )

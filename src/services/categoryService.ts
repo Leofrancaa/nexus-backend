@@ -43,6 +43,22 @@ export class CategoryService {
             throw createErrorResponse(`Já existe uma categoria ${tipo} com este nome.`, 409)
         }
 
+        // Verificar se já existe categoria com a mesma cor e tipo para o usuário
+        if (cor) {
+            const colorExistsResult: QueryResult<{ nome: string }> = await pool.query(
+                'SELECT nome FROM categories WHERE cor = $1 AND user_id = $2 AND tipo = $3',
+                [cor, userId, tipo]
+            )
+
+            if (colorExistsResult.rowCount && colorExistsResult.rowCount > 0) {
+                const existingCategory = colorExistsResult.rows[0].nome
+                throw createErrorResponse(
+                    `A cor selecionada já está sendo usada pela categoria "${existingCategory}" do tipo ${tipo}.`,
+                    409
+                )
+            }
+        }
+
         // Verificar se parent_id existe e pertence ao usuário (se fornecido)
         if (parent_id) {
             const parentResult = await pool.query(
