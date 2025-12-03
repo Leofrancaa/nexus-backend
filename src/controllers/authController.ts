@@ -78,11 +78,11 @@ export const registerUser = async (req: Request<{}, AuthResponse, RegisterReques
 
         const user = result.rows[0]
 
-        // Gerar token JWT (24 horas de validade)
+        // Gerar token JWT (7 dias de validade)
         const token = jwt.sign(
             { id: user.id, nome: user.nome, email: user.email },
             JWT_SECRET,
-            { expiresIn: '24h' }
+            { expiresIn: '7d' }
         )
 
         console.log('[registerUser] Token gerado:', token ? 'SUCCESS' : 'FAILED', token ? token.length : 0)
@@ -176,11 +176,11 @@ export const loginUser = async (req: Request<{}, AuthResponse, LoginRequest>, re
 
         console.log('[loginUser] Senha correta, gerando token...')
 
-        // Gerar token JWT (24 horas de validade)
+        // Gerar token JWT (7 dias de validade)
         const token = jwt.sign(
             { id: user.id, nome: user.nome, email: user.email },
             JWT_SECRET,
-            { expiresIn: '24h' }
+            { expiresIn: '7d' }
         )
 
         console.log('[loginUser] Token gerado:', token ? 'SUCCESS' : 'FAILED')
@@ -227,4 +227,94 @@ export const logoutUser = async (req: Request, res: Response): Promise<void> => 
         success: true,
         message: 'Logout realizado com sucesso. Remova o token do cliente.'
     })
+}
+
+export const changePassword = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const userId = (req as any).user?.id // ID do usuário autenticado vindo do middleware
+        const { senhaAtual, novaSenha } = req.body
+
+        console.log('[changePassword] Iniciando alteração de senha para usuário:', userId)
+
+        // Validação de entrada
+        if (!senhaAtual || !novaSenha) {
+            res.status(400).json({
+                success: false,
+                message: 'Senha atual e nova senha são obrigatórias.',
+                error: 'Senha atual e nova senha são obrigatórias.'
+            })
+            return
+        }
+
+        // Validação da nova senha
+        if (novaSenha.length < 6) {
+            res.status(400).json({
+                success: false,
+                message: 'A nova senha deve ter pelo menos 6 caracteres.',
+                error: 'A nova senha deve ter pelo menos 6 caracteres.'
+            })
+            return
+        }
+
+        // Buscar usuário com senha
+        const result: QueryResult<User> = await pool.query(
+            'SELECT id, senha FROM users WHERE id = $1',
+            [userId]
+        )
+
+        if (result.rowCount === 0) {
+            res.status(404).json({
+                success: false,
+                message: 'Usuário não encontrado.',
+                error: 'Usuário não encontrado.'
+            })
+            return
+        }
+
+        const user = result.rows[0]
+
+        // Verificar senha atual
+        if (!user.senha) {
+            res.status(500).json({
+                success: false,
+                message: 'Erro interno do servidor',
+                error: 'Dados do usuário inconsistentes.'
+            })
+            return
+        }
+
+        const isPasswordCorrect = await bcrypt.compare(senhaAtual, user.senha)
+
+        if (!isPasswordCorrect) {
+            res.status(401).json({
+                success: false,
+                message: 'Senha atual incorreta.',
+                error: 'Senha atual incorreta.'
+            })
+            return
+        }
+
+        // Hash da nova senha
+        const hashedPassword = await bcrypt.hash(novaSenha, 12)
+
+        // Atualizar senha no banco
+        await pool.query(
+            'UPDATE users SET senha = $1, updated_at = NOW() WHERE id = $2',
+            [hashedPassword, userId]
+        )
+
+        console.log('[changePassword] Senha alterada com sucesso para usuário:', userId)
+
+        res.status(200).json({
+            success: true,
+            message: 'Senha alterada com sucesso.'
+        })
+    } catch (error) {
+        console.error('[changePassword] Erro:', error)
+        res.status(500).json({
+            success: false,
+            message: 'Erro interno do servidor',
+            error: 'Erro ao alterar senha.'
+        })
+    }
 }

@@ -1,6 +1,8 @@
 import express, { Application, Request, Response } from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
 
 // Routes
 import authRoutes from './routes/authRoutes'
@@ -39,6 +41,35 @@ const corsOptions = {
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }
+
+// Security Middlewares
+app.use(helmet({
+    contentSecurityPolicy: false, // Desabilitar CSP para compatibilidade com Vercel
+    crossOriginEmbedderPolicy: false
+}))
+
+// Rate limiting para prevenir ataques de força bruta
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 100, // Máximo de 100 requisições por IP
+    message: 'Muitas requisições deste IP, tente novamente em alguns minutos.',
+    standardHeaders: true,
+    legacyHeaders: false,
+})
+
+// Rate limiting mais restritivo para rotas de autenticação
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 10, // Máximo de 10 tentativas de login por IP
+    message: 'Muitas tentativas de login, tente novamente em alguns minutos.',
+    standardHeaders: true,
+    legacyHeaders: false,
+})
+
+// Aplicar rate limiters
+app.use('/auth/login', authLimiter)
+app.use('/auth/register', authLimiter)
+app.use(limiter)
 
 // Middlewares
 app.use(cors(corsOptions))
