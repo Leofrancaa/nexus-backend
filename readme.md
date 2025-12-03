@@ -398,7 +398,7 @@ Este software é fornecido "como está", sem garantias de qualquer tipo, express
 
 ### Contato
 
-Para solicitações de licenciamento ou permissões, entre em contato através de [seu-email@exemplo.com].
+Para solicitações de licenciamento ou permissões, entre em contato através de [leofrancal17@gmail.com].
 
 ---
 
