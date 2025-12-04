@@ -10,6 +10,7 @@ import {
     AuthResponse,
     QueryResult
 } from '../types/index'
+import { generateResetToken, sendPasswordResetEmail } from '../services/emailService'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'segredo_inseguro'
 
@@ -315,6 +316,163 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
             success: false,
             message: 'Erro interno do servidor',
             error: 'Erro ao alterar senha.'
+        })
+    }
+}
+
+export const requestPasswordReset = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { email } = req.body
+
+        console.log('[requestPasswordReset] Solicitação de recuperação para:', email)
+
+        // Validação de entrada
+        if (!email) {
+            res.status(400).json({
+                success: false,
+                message: 'Email é obrigatório.',
+                error: 'Email é obrigatório.'
+            })
+            return
+        }
+
+        // Validação de email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(email)) {
+            res.status(400).json({
+                success: false,
+                message: 'Email inválido.',
+                error: 'Email inválido.'
+            })
+            return
+        }
+
+        // Buscar usuário
+        const result: QueryResult<User> = await pool.query(
+            'SELECT id, nome, email FROM users WHERE email = $1',
+            [email.toLowerCase()]
+        )
+
+        // Por segurança, sempre retornar sucesso mesmo se o email não existir
+        // Isso evita que atacantes descubram quais emails estão cadastrados
+        if (result.rowCount === 0) {
+            console.log('[requestPasswordReset] Email não encontrado, mas retornando sucesso por segurança')
+            res.status(200).json({
+                success: true,
+                message: 'Se o email estiver cadastrado, você receberá um link de recuperação.'
+            })
+            return
+        }
+
+        const user = result.rows[0]
+
+        // Gerar token de recuperação
+        const resetToken = generateResetToken()
+        const resetExpires = new Date(Date.now() + 3600000) // 1 hora
+
+        // Salvar token no banco
+        await pool.query(
+            'UPDATE users SET reset_password_token = $1, reset_password_expires = $2 WHERE id = $3',
+            [resetToken, resetExpires, user.id]
+        )
+
+        // Enviar email
+        try {
+            await sendPasswordResetEmail(user.email, resetToken, user.nome)
+            console.log('[requestPasswordReset] Email enviado com sucesso para:', user.email)
+        } catch (emailError) {
+            console.error('[requestPasswordReset] Erro ao enviar email:', emailError)
+            // Limpar token se falhou ao enviar email
+            await pool.query(
+                'UPDATE users SET reset_password_token = NULL, reset_password_expires = NULL WHERE id = $1',
+                [user.id]
+            )
+            res.status(500).json({
+                success: false,
+                message: 'Erro ao enviar email de recuperação. Tente novamente mais tarde.',
+                error: 'Erro ao enviar email.'
+            })
+            return
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Se o email estiver cadastrado, você receberá um link de recuperação.'
+        })
+    } catch (error) {
+        console.error('[requestPasswordReset] Erro:', error)
+        res.status(500).json({
+            success: false,
+            message: 'Erro interno do servidor',
+            error: 'Erro ao processar solicitação.'
+        })
+    }
+}
+
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { token, novaSenha } = req.body
+
+        console.log('[resetPassword] Iniciando redefinição de senha com token')
+
+        // Validação de entrada
+        if (!token || !novaSenha) {
+            res.status(400).json({
+                success: false,
+                message: 'Token e nova senha são obrigatórios.',
+                error: 'Token e nova senha são obrigatórios.'
+            })
+            return
+        }
+
+        // Validação da nova senha
+        if (novaSenha.length < 6) {
+            res.status(400).json({
+                success: false,
+                message: 'A nova senha deve ter pelo menos 6 caracteres.',
+                error: 'A nova senha deve ter pelo menos 6 caracteres.'
+            })
+            return
+        }
+
+        // Buscar usuário com token válido
+        const result: QueryResult<User> = await pool.query(
+            'SELECT id, email, nome FROM users WHERE reset_password_token = $1 AND reset_password_expires > NOW()',
+            [token]
+        )
+
+        if (result.rowCount === 0) {
+            res.status(400).json({
+                success: false,
+                message: 'Token inválido ou expirado.',
+                error: 'Token inválido ou expirado.'
+            })
+            return
+        }
+
+        const user = result.rows[0]
+
+        // Hash da nova senha
+        const hashedPassword = await bcrypt.hash(novaSenha, 12)
+
+        // Atualizar senha e limpar token
+        await pool.query(
+            'UPDATE users SET senha = $1, reset_password_token = NULL, reset_password_expires = NULL, updated_at = NOW() WHERE id = $2',
+            [hashedPassword, user.id]
+        )
+
+        console.log('[resetPassword] Senha redefinida com sucesso para usuário:', user.email)
+
+        res.status(200).json({
+            success: true,
+            message: 'Senha redefinida com sucesso. Você já pode fazer login.'
+        })
+    } catch (error) {
+        console.error('[resetPassword] Erro:', error)
+        res.status(500).json({
+            success: false,
+            message: 'Erro interno do servidor',
+            error: 'Erro ao redefinir senha.'
         })
     }
 }
