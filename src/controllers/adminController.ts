@@ -1,6 +1,6 @@
 // src/controllers/adminController.ts
 import { Request, Response } from 'express';
-import pool from '../config/database';
+import { pool } from '../database/index';
 
 // Listar todos os usuários (somente para admin)
 export const listAllUsers = async (req: Request, res: Response) => {

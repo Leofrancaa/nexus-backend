@@ -1,6 +1,6 @@
 // src/controllers/inviteCodeController.ts
 import { Request, Response } from 'express';
-import pool from '../config/database';
+import { pool } from '../database/index';
 import crypto from 'crypto';
 
 // Gerar código de convite aleatório
