@@ -11,12 +11,13 @@ import {
     QueryResult
 } from '../types/index'
 import { generateResetToken, sendPasswordResetEmail } from '../services/emailService'
+import { markInviteCodeAsUsed } from './inviteCodeController'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'segredo_inseguro'
 
 export const registerUser = async (req: Request<{}, AuthResponse, RegisterRequest>, res: Response<AuthResponse>): Promise<void> => {
     try {
-        const { nome, email, senha } = req.body
+        const { nome, email, senha, inviteCode } = req.body
 
         console.log('[registerUser] Iniciando registro para:', email)
 
@@ -26,6 +27,53 @@ export const registerUser = async (req: Request<{}, AuthResponse, RegisterReques
                 success: false,
                 message: 'Nome, e-mail e senha são obrigatórios.',
                 error: 'Nome, e-mail e senha são obrigatórios.'
+            } as any)
+            return
+        }
+
+        // Validar código de convite
+        if (!inviteCode) {
+            res.status(400).json({
+                success: false,
+                message: 'Código de convite é obrigatório.',
+                error: 'Código de convite é obrigatório.'
+            } as any)
+            return
+        }
+
+        // Verificar se o código de convite é válido
+        const inviteResult = await pool.query(
+            `SELECT id, code, is_used, expires_at
+             FROM invite_codes
+             WHERE code = $1`,
+            [inviteCode.toUpperCase()]
+        )
+
+        if (inviteResult.rows.length === 0) {
+            res.status(400).json({
+                success: false,
+                message: 'Código de convite inválido.',
+                error: 'Código de convite inválido.'
+            } as any)
+            return
+        }
+
+        const invite = inviteResult.rows[0]
+
+        if (invite.is_used) {
+            res.status(400).json({
+                success: false,
+                message: 'Este código de convite já foi utilizado.',
+                error: 'Este código de convite já foi utilizado.'
+            } as any)
+            return
+        }
+
+        if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+            res.status(400).json({
+                success: false,
+                message: 'Este código de convite expirou.',
+                error: 'Este código de convite expirou.'
             } as any)
             return
         }
@@ -78,6 +126,9 @@ export const registerUser = async (req: Request<{}, AuthResponse, RegisterReques
         )
 
         const user = result.rows[0]
+
+        // Marcar código de convite como usado
+        await markInviteCodeAsUsed(inviteCode.toUpperCase(), user.id)
 
         // Gerar token JWT (7 dias de validade)
         const token = jwt.sign(

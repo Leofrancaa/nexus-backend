@@ -16,6 +16,8 @@ import dashboardRoutes from './routes/dashboardRoutes'
 import userRoutes from './routes/userRoutes'
 import currencyRoutes from './routes/currencyRoutes'
 import planRoutes from './routes/planRoutes'
+import inviteCodeRoutes from './routes/inviteCodeRoutes'
+import adminRoutes from './routes/adminRoutes'
 
 // Carregar variáveis de ambiente
 dotenv.config()
@@ -88,6 +90,8 @@ app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/users', currencyRoutes)
 app.use('/api', userRoutes)
 app.use('/api/plans', planRoutes)
+app.use('/api/invite-codes', inviteCodeRoutes)
+app.use('/api/admin', adminRoutes)
 
 // Health check
 app.get('/ping', async (req: Request, res: Response): Promise<void> => {
