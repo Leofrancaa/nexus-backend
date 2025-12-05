@@ -50,6 +50,24 @@ app.use(helmet({
     crossOriginEmbedderPolicy: false
 }))
 
+// Key generator para rate limiting no Vercel (usa x-forwarded-for ou x-real-ip)
+const getIpFromRequest = (req: Request): string => {
+    const forwarded = req.headers['x-forwarded-for'] as string
+    const realIp = req.headers['x-real-ip'] as string
+
+    if (forwarded) {
+        // x-forwarded-for pode conter múltiplos IPs separados por vírgula
+        return forwarded.split(',')[0].trim()
+    }
+
+    if (realIp) {
+        return realIp
+    }
+
+    // Fallback para req.ip
+    return req.ip || 'unknown'
+}
+
 // Rate limiting para prevenir ataques de força bruta
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
@@ -57,6 +75,9 @@ const limiter = rateLimit({
     message: 'Muitas requisições deste IP, tente novamente em alguns minutos.',
     standardHeaders: true,
     legacyHeaders: false,
+    keyGenerator: getIpFromRequest,
+    // Desabilitar validação do header Forwarded para evitar erro no Vercel
+    validate: { xForwardedForHeader: false }
 })
 
 // Rate limiting mais restritivo para rotas de autenticação
@@ -66,6 +87,9 @@ const authLimiter = rateLimit({
     message: 'Muitas tentativas de login, tente novamente em alguns minutos.',
     standardHeaders: true,
     legacyHeaders: false,
+    keyGenerator: getIpFromRequest,
+    // Desabilitar validação do header Forwarded para evitar erro no Vercel
+    validate: { xForwardedForHeader: false }
 })
 
 // Aplicar rate limiters
