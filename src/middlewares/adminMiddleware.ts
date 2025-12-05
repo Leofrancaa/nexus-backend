@@ -1,6 +1,6 @@
 // src/middlewares/adminMiddleware.ts
 import { Request, Response, NextFunction } from 'express';
-import pool from '../config/database';
+import { pool } from '../database/index';
 
 const ADMIN_EMAIL = 'nexusfintool1962@gmail.com';
 
