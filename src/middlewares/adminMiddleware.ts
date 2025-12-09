@@ -7,7 +7,7 @@ const ADMIN_EMAIL = 'nexusfintool1962@gmail.com';
 export const isAdmin = async (req: Request, res: Response, next: NextFunction) => {
     console.log('🔍 [adminMiddleware] Verificando permissões de admin...');
     try {
-        const userId = (req as any).userId; // ID do usuário autenticado (do authenticateToken)
+        const userId = (req as any).user?.id; // ID do usuário autenticado (do authenticateToken)
         console.log('🔍 [adminMiddleware] userId:', userId);
 
         if (!userId) {
