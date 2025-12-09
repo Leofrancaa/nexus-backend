@@ -11,7 +11,7 @@ const generateInviteCode = (): string => {
 // Criar um novo código de convite (somente para admin)
 export const createInviteCode = async (req: Request, res: Response) => {
     try {
-        const userId = (req as any).userId; // ID do usuário autenticado
+        const userId = (req as any).user?.id; // ID do usuário autenticado
         const { expiresInDays } = req.body; // Opcional: quantos dias até expirar
 
         // Gerar código único
@@ -106,7 +106,7 @@ export const validateInviteCode = async (req: Request, res: Response) => {
 // Listar todos os códigos de convite (somente para admin)
 export const listInviteCodes = async (req: Request, res: Response) => {
     try {
-        const userId = (req as any).userId;
+        const userId = (req as any).user?.id;
 
         const result = await pool.query(
             `SELECT
@@ -159,7 +159,7 @@ export const markInviteCodeAsUsed = async (code: string, userId: number): Promis
 // Deletar código de convite não utilizado
 export const deleteInviteCode = async (req: Request, res: Response) => {
     try {
-        const userId = (req as any).userId;
+        const userId = (req as any).user?.id;
         const { id } = req.params;
 
         // Verificar se o código pertence ao usuário e não foi usado
