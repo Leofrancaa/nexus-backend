@@ -99,12 +99,8 @@ export class GoalService {
      * Busca todas as metas do usuário com progresso calculado
      */
     static async getGoalsByUser(userId: number, mes?: number, ano?: number): Promise<GoalWithProgress[]> {
-        const now = new Date()
-        const targetMonth = mes || (now.getMonth() + 1)
-        const targetYear = ano || now.getFullYear()
-
-        const result = await pool.query(
-            `SELECT
+        // Se mes e ano não forem fornecidos, buscar todas as metas
+        let query = `SELECT
                 g.*,
                 c.nome as categoria_nome,
                 c.cor as categoria_cor,
@@ -130,10 +126,23 @@ export class GoalService {
                 ) as valor_atual
             FROM goals g
             LEFT JOIN categories c ON g.category_id = c.id
-            WHERE g.user_id = $1 AND g.mes = $2 AND g.ano = $3
-            ORDER BY g.created_at DESC`,
-            [userId, targetMonth, targetYear]
-        )
+            WHERE g.user_id = $1`
+
+        const params: any[] = [userId]
+
+        // Adicionar filtros apenas se fornecidos
+        if (mes !== undefined) {
+            params.push(mes)
+            query += ` AND g.mes = $${params.length}`
+        }
+        if (ano !== undefined) {
+            params.push(ano)
+            query += ` AND g.ano = $${params.length}`
+        }
+
+        query += ` ORDER BY g.created_at DESC`
+
+        const result = await pool.query(query, params)
 
         return result.rows.map(row => {
             const valorAlvo = Number(row.valor_alvo)
@@ -246,11 +255,8 @@ export class GoalService {
         total_target: number
         total_achieved: number
     }> {
-        const now = new Date()
-        const targetMonth = mes || (now.getMonth() + 1)
-        const targetYear = ano || now.getFullYear()
-
-        const goals = await this.getGoalsByUser(userId, targetMonth, targetYear)
+        // Buscar metas com ou sem filtro de data
+        const goals = await this.getGoalsByUser(userId, mes, ano)
 
         const stats = goals.reduce((acc, goal) => {
             acc.total_goals++
