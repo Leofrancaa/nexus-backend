@@ -32,13 +32,28 @@ export class CardService {
             dias_fechamento_antes = 10
         } = cardData
 
+        console.log('[CardService.createCard] Dados recebidos:', {
+            nome,
+            tipo,
+            numero,
+            limite,
+            dia_vencimento,
+            dias_fechamento_antes
+        })
+
         // Validações
         if (!numero || numero.length !== 4) {
             throw createErrorResponse("O número do cartão deve conter exatamente 4 dígitos.", 400)
         }
 
+        // Normalizar tipo (aceitar com ou sem acento)
+        const isCredito = tipo === 'crédito' || tipo === 'credito'
+        const isDebito = tipo === 'débito' || tipo === 'debito'
+
+        console.log('[CardService.createCard] Tipo normalizado:', { tipo, isCredito, isDebito })
+
         // Validações específicas para cartões de crédito
-        if (tipo === 'crédito') {
+        if (isCredito) {
             if (!dia_vencimento || dia_vencimento < 1 || dia_vencimento > 31) {
                 throw createErrorResponse("O dia de vencimento deve estar entre 1 e 31 para cartões de crédito.", 400)
             }
@@ -53,8 +68,8 @@ export class CardService {
         }
 
         // Para cartões de débito, garantir que os campos opcionais sejam null
-        const diaVencimentoFinal = tipo === 'débito' ? null : dia_vencimento
-        const diasFechamentoAntesFinal = tipo === 'débito' ? null : dias_fechamento_antes
+        const diaVencimentoFinal = isDebito ? null : dia_vencimento
+        const diasFechamentoAntesFinal = isDebito ? null : dias_fechamento_antes
 
         const result: QueryResult<Card> = await pool.query(
             `INSERT INTO cards (
