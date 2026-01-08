@@ -67,9 +67,10 @@ export class CardService {
             }
         }
 
-        // Para cartões de débito, garantir que os campos opcionais sejam null
-        const diaVencimentoFinal = isDebito ? null : dia_vencimento
-        const diasFechamentoAntesFinal = isDebito ? null : dias_fechamento_antes
+        // Para cartões de débito, usar valores padrão ao invés de null
+        // pois o banco não aceita null nessas colunas
+        const diaVencimentoFinal = isDebito ? 1 : dia_vencimento
+        const diasFechamentoAntesFinal = isDebito ? 1 : dias_fechamento_antes
 
         const result: QueryResult<Card> = await pool.query(
             `INSERT INTO cards (

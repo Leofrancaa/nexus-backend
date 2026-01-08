@@ -26,8 +26,14 @@ export const createCard = async (
         const userId = authReq.user.id
         const cardData: CreateCardRequest = req.body
 
+        console.log('[CardController.createCard] Dados recebidos do cliente:', {
+            body: req.body,
+            userId
+        })
+
         // Validações básicas
         if (!cardData.nome || !cardData.tipo || !cardData.numero) {
+            console.log('[CardController.createCard] Validação falhou - campos obrigatórios faltando')
             sendErrorResponse(res, 'Nome, tipo e número são obrigatórios.', 400)
             return
         }
@@ -73,10 +79,18 @@ export const createCard = async (
         // Atualizar tipo normalizado no cardData
         cardData.tipo = tipoNormalizado
 
+        console.log('[CardController.createCard] Chamando CardService com:', {
+            cardData,
+            userId
+        })
+
         const result = await CardService.createCard(cardData, userId)
+
+        console.log('[CardController.createCard] Cartão criado com sucesso:', result)
+
         sendSuccessResponse(res, result, 'Cartão criado com sucesso.', 201)
     } catch (error) {
-        console.error('Erro ao criar cartão:', error)
+        console.error('[CardController.createCard] ERRO:', error)
 
         const apiError = error as ApiError
         sendErrorResponse(
