@@ -212,61 +212,90 @@ export class CategoryService {
     }
 
     /**
-     * Remove uma categoria
+     * Remove uma categoria e todas as suas subcategorias e transações vinculadas
      */
-    static async deleteCategory(categoryId: number, userId: number): Promise<{ message: string }> {
+    static async deleteCategory(categoryId: number, userId: number): Promise<{ message: string; deletedItems: { subcategorias: number; despesas: number; receitas: number } }> {
         // Verificar se a categoria existe
         const category = await this.getCategoryById(categoryId, userId)
         if (!category) {
             throw createErrorResponse("Categoria não encontrada.", 404)
         }
 
-        // Verificar se tem subcategorias
-        const hasChildren = await pool.query(
-            'SELECT COUNT(*) as count FROM categories WHERE parent_id = $1 AND user_id = $2',
-            [categoryId, userId]
+        // Buscar todas as subcategorias recursivamente
+        const subcategoryIds = await this.getAllSubcategoryIds(categoryId, userId)
+        const allCategoryIds = [categoryId, ...subcategoryIds]
+
+        // Contar quantas transações serão excluídas
+        const expensesCount = await pool.query(
+            `SELECT COUNT(*) as count FROM expenses WHERE category_id = ANY($1) AND user_id = $2`,
+            [allCategoryIds, userId]
         )
 
-        if (Number(hasChildren.rows[0].count) > 0) {
-            throw createErrorResponse(
-                "Não é possível excluir uma categoria que possui subcategorias. Exclua as subcategorias primeiro.",
-                400
-            )
-        }
-
-        // Verificar se tem despesas/receitas vinculadas
-        const hasExpenses = await pool.query(
-            'SELECT COUNT(*) as count FROM expenses WHERE category_id = $1 AND user_id = $2',
-            [categoryId, userId]
+        const incomesCount = await pool.query(
+            `SELECT COUNT(*) as count FROM incomes WHERE category_id = ANY($1) AND user_id = $2`,
+            [allCategoryIds, userId]
         )
 
-        const hasIncomes = await pool.query(
-            'SELECT COUNT(*) as count FROM incomes WHERE category_id = $1 AND user_id = $2',
-            [categoryId, userId]
-        )
-
-        const totalTransactions = Number(hasExpenses.rows[0].count) + Number(hasIncomes.rows[0].count)
-
-        if (totalTransactions > 0) {
-            throw createErrorResponse(
-                `Não é possível excluir uma categoria que possui ${totalTransactions} transação(ões) vinculada(s).`,
-                400
-            )
-        }
-
-        // Remover thresholds vinculados à categoria
+        // Deletar despesas vinculadas
         await pool.query(
-            'DELETE FROM thresholds WHERE category_id = $1 AND user_id = $2',
-            [categoryId, userId]
+            'DELETE FROM expenses WHERE category_id = ANY($1) AND user_id = $2',
+            [allCategoryIds, userId]
         )
 
-        // Deletar a categoria
+        // Deletar receitas vinculadas
+        await pool.query(
+            'DELETE FROM incomes WHERE category_id = ANY($1) AND user_id = $2',
+            [allCategoryIds, userId]
+        )
+
+        // Remover thresholds vinculados às categorias
+        await pool.query(
+            'DELETE FROM thresholds WHERE category_id = ANY($1) AND user_id = $2',
+            [allCategoryIds, userId]
+        )
+
+        // Deletar subcategorias
+        if (subcategoryIds.length > 0) {
+            await pool.query(
+                'DELETE FROM categories WHERE id = ANY($1) AND user_id = $2',
+                [subcategoryIds, userId]
+            )
+        }
+
+        // Deletar a categoria principal
         await pool.query(
             'DELETE FROM categories WHERE id = $1 AND user_id = $2',
             [categoryId, userId]
         )
 
-        return { message: "Categoria removida com sucesso." }
+        return {
+            message: "Categoria removida com sucesso.",
+            deletedItems: {
+                subcategorias: subcategoryIds.length,
+                despesas: Number(expensesCount.rows[0].count),
+                receitas: Number(incomesCount.rows[0].count)
+            }
+        }
+    }
+
+    /**
+     * Busca todos os IDs de subcategorias recursivamente
+     */
+    private static async getAllSubcategoryIds(categoryId: number, userId: number): Promise<number[]> {
+        const result = await pool.query(
+            'SELECT id FROM categories WHERE parent_id = $1 AND user_id = $2',
+            [categoryId, userId]
+        )
+
+        const subcategoryIds: number[] = result.rows.map(row => row.id)
+
+        // Buscar recursivamente subcategorias das subcategorias
+        for (const subId of subcategoryIds) {
+            const childIds = await this.getAllSubcategoryIds(subId, userId)
+            subcategoryIds.push(...childIds)
+        }
+
+        return subcategoryIds
     }
 
     /**
