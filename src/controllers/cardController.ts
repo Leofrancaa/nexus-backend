@@ -27,14 +27,36 @@ export const createCard = async (
         const cardData: CreateCardRequest = req.body
 
         // Validações básicas
-        if (!cardData.nome || !cardData.tipo || !cardData.numero || !cardData.limite) {
-            sendErrorResponse(res, 'Nome, tipo, número e limite são obrigatórios.', 400)
+        if (!cardData.nome || !cardData.tipo || !cardData.numero) {
+            sendErrorResponse(res, 'Nome, tipo e número são obrigatórios.', 400)
             return
         }
 
-        if (!isPositiveNumber(cardData.limite)) {
-            sendErrorResponse(res, 'Limite deve ser um número positivo.', 400)
+        // Validar tipo
+        if (cardData.tipo !== 'crédito' && cardData.tipo !== 'débito') {
+            sendErrorResponse(res, 'Tipo deve ser "crédito" ou "débito".', 400)
             return
+        }
+
+        // Para cartão de crédito, validar campos obrigatórios
+        if (cardData.tipo === 'crédito') {
+            if (!cardData.limite) {
+                sendErrorResponse(res, 'Limite é obrigatório para cartões de crédito.', 400)
+                return
+            }
+
+            if (!isPositiveNumber(cardData.limite)) {
+                sendErrorResponse(res, 'Limite deve ser um número positivo.', 400)
+                return
+            }
+
+            if (!cardData.dia_vencimento) {
+                sendErrorResponse(res, 'Dia de vencimento é obrigatório para cartões de crédito.', 400)
+                return
+            }
+        } else {
+            // Para cartão de débito, definir limite padrão como 0
+            cardData.limite = 0
         }
 
         if (cardData.cor && !isValidHexColor(cardData.cor)) {
