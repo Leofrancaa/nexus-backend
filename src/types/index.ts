@@ -69,7 +69,7 @@ export interface CreateCategoryRequest {
 export interface Card {
     id: number
     nome: string
-    tipo: string
+    tipo: 'crédito' | 'débito' | 'credito' | 'debito'
     numero: string
     cor: string
     limite: number
@@ -83,10 +83,10 @@ export interface Card {
 
 export interface CreateCardRequest {
     nome: string
-    tipo: string
+    tipo: 'crédito' | 'débito' | 'credito' | 'debito'
     numero: string
     cor: string
-    limite: number
+    limite?: number
     dia_vencimento?: number
     dias_fechamento_antes?: number
 }

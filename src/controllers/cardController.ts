@@ -32,14 +32,20 @@ export const createCard = async (
             return
         }
 
-        // Validar tipo
-        if (cardData.tipo !== 'crédito' && cardData.tipo !== 'débito') {
+        // Validar tipo (aceitar com ou sem acento)
+        const tiposValidos = ['crédito', 'débito', 'credito', 'debito']
+        if (!tiposValidos.includes(cardData.tipo)) {
             sendErrorResponse(res, 'Tipo deve ser "crédito" ou "débito".', 400)
             return
         }
 
+        // Normalizar tipo para formato com acento
+        const tipoNormalizado = cardData.tipo === 'credito' ? 'crédito' :
+                               cardData.tipo === 'debito' ? 'débito' :
+                               cardData.tipo
+
         // Para cartão de crédito, validar campos obrigatórios
-        if (cardData.tipo === 'crédito') {
+        if (tipoNormalizado === 'crédito') {
             if (!cardData.limite) {
                 sendErrorResponse(res, 'Limite é obrigatório para cartões de crédito.', 400)
                 return
@@ -63,6 +69,9 @@ export const createCard = async (
             sendErrorResponse(res, 'Cor deve estar no formato hexadecimal válido.', 400)
             return
         }
+
+        // Atualizar tipo normalizado no cardData
+        cardData.tipo = tipoNormalizado
 
         const result = await CardService.createCard(cardData, userId)
         sendSuccessResponse(res, result, 'Cartão criado com sucesso.', 201)
