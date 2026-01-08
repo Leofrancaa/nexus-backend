@@ -27,7 +27,7 @@ export class CardService {
             tipo,
             numero,
             cor,
-            limite,
+            limite = 0,
             dia_vencimento,
             dias_fechamento_antes = 10
         } = cardData
@@ -37,17 +37,24 @@ export class CardService {
             throw createErrorResponse("O número do cartão deve conter exatamente 4 dígitos.", 400)
         }
 
-        if (dia_vencimento && (dia_vencimento < 1 || dia_vencimento > 31)) {
-            throw createErrorResponse("O dia de vencimento deve estar entre 1 e 31.", 400)
+        // Validações específicas para cartões de crédito
+        if (tipo === 'crédito') {
+            if (!dia_vencimento || dia_vencimento < 1 || dia_vencimento > 31) {
+                throw createErrorResponse("O dia de vencimento deve estar entre 1 e 31 para cartões de crédito.", 400)
+            }
+
+            if (dias_fechamento_antes != null && (dias_fechamento_antes < 1 || dias_fechamento_antes > 31)) {
+                throw createErrorResponse("Dias de fechamento antes deve estar entre 1 e 31.", 400)
+            }
+
+            if (!isPositiveNumber(limite)) {
+                throw createErrorResponse("Limite deve ser um número positivo para cartões de crédito.", 400)
+            }
         }
 
-        if (dias_fechamento_antes != null && (dias_fechamento_antes < 1 || dias_fechamento_antes > 31)) {
-            throw createErrorResponse("Dias de fechamento antes deve estar entre 1 e 31.", 400)
-        }
-
-        if (!isPositiveNumber(limite)) {
-            throw createErrorResponse("Limite deve ser um número positivo.", 400)
-        }
+        // Para cartões de débito, garantir que os campos opcionais sejam null
+        const diaVencimentoFinal = tipo === 'débito' ? null : dia_vencimento
+        const diasFechamentoAntesFinal = tipo === 'débito' ? null : dias_fechamento_antes
 
         const result: QueryResult<Card> = await pool.query(
             `INSERT INTO cards (
@@ -60,10 +67,10 @@ export class CardService {
                 nome,
                 tipo,
                 numero,
-                cor,
+                cor || '#6B7280',
                 limite,
-                dia_vencimento,
-                dias_fechamento_antes,
+                diaVencimentoFinal,
+                diasFechamentoAntesFinal,
                 userId
             ]
         )
