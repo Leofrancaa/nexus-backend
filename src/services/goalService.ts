@@ -5,8 +5,6 @@ import { createErrorResponse, isPositiveNumber } from '../utils/helper'
 interface Goal {
     id: number
     user_id: number
-    category_id: number | null
-    tipo: 'receita' | 'despesa'
     nome: string
     valor_alvo: number
     mes: number
@@ -16,8 +14,6 @@ interface Goal {
 }
 
 interface CreateGoalRequest {
-    category_id?: number
-    tipo: 'receita' | 'despesa'
     nome: string
     valor_alvo: number
     mes: number
@@ -27,69 +23,43 @@ interface CreateGoalRequest {
 interface GoalWithProgress extends Goal {
     valor_atual: number
     progresso: number
-    categoria?: {
-        id: number
-        nome: string
-        cor: string
-    }
 }
 
 export class GoalService {
     /**
-     * Cria uma nova meta
+     * Cria uma nova meta de receita mensal
      */
     static async createGoal(
         goalData: CreateGoalRequest,
         userId: number
     ): Promise<Goal> {
-        const { category_id, tipo, nome, valor_alvo, mes, ano } = goalData
+        const { nome, valor_alvo, mes, ano } = goalData
 
         // Validações
-        if (!nome || !tipo || !isPositiveNumber(valor_alvo) || !mes || !ano) {
-            throw createErrorResponse("Nome, tipo, valor positivo, mês e ano são obrigatórios.", 400)
+        if (!nome || !isPositiveNumber(valor_alvo) || !mes || !ano) {
+            throw createErrorResponse("Nome, valor positivo, mês e ano são obrigatórios.", 400)
         }
 
         if (mes < 1 || mes > 12) {
             throw createErrorResponse("Mês deve estar entre 1 e 12.", 400)
         }
 
-        if (tipo !== 'receita' && tipo !== 'despesa') {
-            throw createErrorResponse("Tipo deve ser 'receita' ou 'despesa'.", 400)
-        }
-
-        // Se category_id for fornecido, verificar se existe e é do tipo correto
-        if (category_id) {
-            const categoryResult = await pool.query(
-                'SELECT id, tipo FROM categories WHERE id = $1 AND user_id = $2',
-                [category_id, userId]
-            )
-
-            if (categoryResult.rowCount === 0) {
-                throw createErrorResponse("Categoria não encontrada.", 404)
-            }
-
-            if (categoryResult.rows[0].tipo !== tipo) {
-                throw createErrorResponse(`Categoria deve ser do tipo ${tipo}.`, 400)
-            }
-        }
-
-        // Verificar se já existe meta para essa combinação
+        // Verificar se já existe meta para este mês/ano
         const existingResult = await pool.query(
             `SELECT id FROM goals
-             WHERE user_id = $1 AND category_id IS NOT DISTINCT FROM $2
-             AND tipo = $3 AND mes = $4 AND ano = $5`,
-            [userId, category_id || null, tipo, mes, ano]
+             WHERE user_id = $1 AND mes = $2 AND ano = $3`,
+            [userId, mes, ano]
         )
 
         if (existingResult.rowCount && existingResult.rowCount > 0) {
-            throw createErrorResponse("Já existe uma meta para esta categoria/tipo neste período.", 409)
+            throw createErrorResponse("Já existe uma meta para este mês/ano.", 409)
         }
 
         const result: QueryResult<Goal> = await pool.query(
-            `INSERT INTO goals (user_id, category_id, tipo, nome, valor_alvo, mes, ano)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `INSERT INTO goals (user_id, nome, valor_alvo, mes, ano)
+             VALUES ($1, $2, $3, $4, $5)
              RETURNING *`,
-            [userId, category_id || null, tipo, nome, valor_alvo, mes, ano]
+            [userId, nome, valor_alvo, mes, ano]
         )
 
         return result.rows[0]
@@ -99,33 +69,19 @@ export class GoalService {
      * Busca todas as metas do usuário com progresso calculado
      */
     static async getGoalsByUser(userId: number, mes?: number, ano?: number): Promise<GoalWithProgress[]> {
-        // Se mes e ano não forem fornecidos, buscar todas as metas
+        // Buscar todas as metas do usuário
         let query = `SELECT
                 g.*,
-                c.nome as categoria_nome,
-                c.cor as categoria_cor,
                 COALESCE(
-                    CASE
-                        WHEN g.tipo = 'despesa' THEN (
-                            SELECT SUM(e.quantidade)
-                            FROM expenses e
-                            WHERE e.user_id = g.user_id
-                            AND (g.category_id IS NULL OR e.category_id = g.category_id)
-                            AND EXTRACT(MONTH FROM e.data) = g.mes
-                            AND EXTRACT(YEAR FROM e.data) = g.ano
-                        )
-                        WHEN g.tipo = 'receita' THEN (
-                            SELECT SUM(i.quantidade)
-                            FROM incomes i
-                            WHERE i.user_id = g.user_id
-                            AND (g.category_id IS NULL OR i.category_id = g.category_id)
-                            AND EXTRACT(MONTH FROM i.data) = g.mes
-                            AND EXTRACT(YEAR FROM i.data) = g.ano
-                        )
-                    END, 0
+                    (
+                        SELECT SUM(i.quantidade)
+                        FROM incomes i
+                        WHERE i.user_id = g.user_id
+                        AND EXTRACT(MONTH FROM i.data) = g.mes
+                        AND EXTRACT(YEAR FROM i.data) = g.ano
+                    ), 0
                 ) as valor_atual
             FROM goals g
-            LEFT JOIN categories c ON g.category_id = c.id
             WHERE g.user_id = $1`
 
         const params: any[] = [userId]
@@ -140,7 +96,7 @@ export class GoalService {
             query += ` AND g.ano = $${params.length}`
         }
 
-        query += ` ORDER BY g.created_at DESC`
+        query += ` ORDER BY g.ano DESC, g.mes DESC`
 
         const result = await pool.query(query, params)
 
@@ -152,8 +108,6 @@ export class GoalService {
             return {
                 id: row.id,
                 user_id: row.user_id,
-                category_id: row.category_id,
-                tipo: row.tipo,
                 nome: row.nome,
                 valor_alvo: valorAlvo,
                 mes: row.mes,
@@ -161,12 +115,7 @@ export class GoalService {
                 created_at: row.created_at,
                 updated_at: row.updated_at,
                 valor_atual: valorAtual,
-                progresso: Math.round(progresso * 100) / 100,
-                categoria: row.categoria_nome ? {
-                    id: row.category_id,
-                    nome: row.categoria_nome,
-                    cor: row.categoria_cor
-                } : undefined
+                progresso: Math.round(progresso * 100) / 100
             }
         })
     }
@@ -191,7 +140,7 @@ export class GoalService {
         updateData: Partial<CreateGoalRequest>,
         userId: number
     ): Promise<Goal> {
-        const { category_id, tipo, nome, valor_alvo, mes, ano } = updateData
+        const { nome, valor_alvo, mes, ano } = updateData
 
         // Verificar se a meta existe
         const exists = await this.getGoalById(goalId, userId)
@@ -208,22 +157,32 @@ export class GoalService {
             throw createErrorResponse("Mês deve estar entre 1 e 12.", 400)
         }
 
-        if (tipo !== undefined && tipo !== 'receita' && tipo !== 'despesa') {
-            throw createErrorResponse("Tipo deve ser 'receita' ou 'despesa'.", 400)
+        // Se mudando mes/ano, verificar se já existe meta para o novo período
+        if ((mes !== undefined || ano !== undefined)) {
+            const newMes = mes ?? exists.mes
+            const newAno = ano ?? exists.ano
+
+            const conflictResult = await pool.query(
+                `SELECT id FROM goals
+                 WHERE user_id = $1 AND mes = $2 AND ano = $3 AND id != $4`,
+                [userId, newMes, newAno, goalId]
+            )
+
+            if (conflictResult.rowCount && conflictResult.rowCount > 0) {
+                throw createErrorResponse("Já existe uma meta para este mês/ano.", 409)
+            }
         }
 
         const result: QueryResult<Goal> = await pool.query(
             `UPDATE goals SET
-                category_id = COALESCE($1, category_id),
-                tipo = COALESCE($2, tipo),
-                nome = COALESCE($3, nome),
-                valor_alvo = COALESCE($4, valor_alvo),
-                mes = COALESCE($5, mes),
-                ano = COALESCE($6, ano),
+                nome = COALESCE($1, nome),
+                valor_alvo = COALESCE($2, valor_alvo),
+                mes = COALESCE($3, mes),
+                ano = COALESCE($4, ano),
                 updated_at = NOW()
-             WHERE id = $7 AND user_id = $8
+             WHERE id = $5 AND user_id = $6
              RETURNING *`,
-            [category_id, tipo, nome, valor_alvo, mes, ano, goalId, userId]
+            [nome, valor_alvo, mes, ano, goalId, userId]
         )
 
         return result.rows[0]

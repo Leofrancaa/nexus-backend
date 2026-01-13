@@ -4,7 +4,7 @@ import { AuthenticatedRequest, ApiError } from '../types/index'
 import { sendErrorResponse, sendSuccessResponse, toNumber, isPositiveNumber } from '../utils/helper'
 
 /**
- * POST /api/goals - Criar nova meta
+ * POST /api/goals - Criar nova meta de receita mensal
  */
 export const createGoal = async (
     req: Request,
@@ -17,8 +17,8 @@ export const createGoal = async (
         const goalData = req.body
 
         // Validações básicas
-        if (!goalData.nome || !goalData.tipo || !goalData.valor_alvo || !goalData.mes || !goalData.ano) {
-            sendErrorResponse(res, 'Nome, tipo, valor_alvo, mes e ano são obrigatórios.', 400)
+        if (!goalData.nome || !goalData.valor_alvo || !goalData.mes || !goalData.ano) {
+            sendErrorResponse(res, 'Nome, valor_alvo, mes e ano são obrigatórios.', 400)
             return
         }
 
