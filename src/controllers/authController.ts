@@ -12,7 +12,10 @@ import {
 import { generateResetToken, sendPasswordResetEmail } from '../services/emailService'
 import { markInviteCodeAsUsed } from './inviteCodeController'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'segredo_inseguro'
+const JWT_SECRET = process.env.JWT_SECRET
+if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET não definido nas variáveis de ambiente. Defina JWT_SECRET antes de iniciar o servidor.')
+}
 
 export const registerUser = async (req: Request<{}, AuthResponse, RegisterRequest>, res: Response<AuthResponse>): Promise<void> => {
     try {
@@ -86,7 +89,7 @@ export const registerUser = async (req: Request<{}, AuthResponse, RegisterReques
         const token = jwt.sign(
             { id: user.id, nome: user.nome, email: user.email },
             JWT_SECRET,
-            { expiresIn: '7d' }
+            { expiresIn: '30d' }
         )
 
         console.log('[registerUser] Token gerado:', token ? 'SUCCESS' : 'FAILED')
@@ -134,7 +137,7 @@ export const loginUser = async (req: Request<{}, AuthResponse, LoginRequest>, re
         const token = jwt.sign(
             { id: user.id, nome: user.nome, email: user.email },
             JWT_SECRET,
-            { expiresIn: '7d' }
+            { expiresIn: '30d' }
         )
 
         const { senha: _, ...userWithoutPassword } = user

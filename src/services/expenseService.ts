@@ -129,12 +129,10 @@ export class ExpenseService {
 
         const baseExpense = this.mapToExpense(result)
 
-        if (!expenseData.fixo) {
-            await prisma.card.update({
-                where: { id: card_id! },
-                data: { limite_disponivel: { decrement: Number(quantidade) } }
-            })
-        }
+        await prisma.card.update({
+            where: { id: card_id! },
+            data: { limite_disponivel: { decrement: Number(quantidade) } }
+        })
 
         if (expenseData.fixo) {
             await this.replicateFixedCreditCardExpense(
@@ -175,7 +173,7 @@ export class ExpenseService {
         closeDaysBefore: number
     ): Promise<Expense[]> {
         const { parcelas, quantidade, tipo, card_id } = expenseData
-        const valorParcela = Number(quantidade) / Number(parcelas!)
+        const valorParcela = Math.round((Number(quantidade) / Number(parcelas!)) * 100) / 100
 
         const expenses: Expense[] = []
 

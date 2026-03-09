@@ -4,7 +4,8 @@ import {
     getCards,
     getCard,
     updateCard,
-    deleteCard
+    deleteCard,
+    getFutureInstallments
 } from '../controllers/cardController'
 import {
     payInvoice,
@@ -51,5 +52,8 @@ router.get('/:id/can-pay-invoice', canPayInvoice)
 
 // DELETE /api/cards/:id/cancel-payment - Cancelar pagamento
 router.delete('/:id/cancel-payment', cancelInvoicePayment)
+
+// GET /api/cards/:id/future-installments - Parcelas futuras do cartão
+router.get('/:id/future-installments', getFutureInstallments)
 
 export default router

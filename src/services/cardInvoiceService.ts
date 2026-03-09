@@ -66,14 +66,6 @@ export class CardInvoiceService {
             )
         }
 
-        const alreadyPaid = await prisma.cardInvoicePayment.findFirst({
-            where: { user_id, card_id, competencia_mes, competencia_ano }
-        })
-
-        if (alreadyPaid) {
-            throw createErrorResponse("Esta fatura já foi paga.", 400)
-        }
-
         const totalResult = await prisma.expense.aggregate({
             where: { user_id, card_id, competencia_mes, competencia_ano },
             _sum: { quantidade: true }
@@ -81,7 +73,19 @@ export class CardInvoiceService {
 
         const total = Number(totalResult._sum.quantidade || 0)
 
+        if (total === 0) {
+            throw createErrorResponse("Não há despesas nesta competência para pagar.", 400)
+        }
+
         await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+            const alreadyPaid = await tx.cardInvoicePayment.findFirst({
+                where: { user_id, card_id, competencia_mes, competencia_ano }
+            })
+
+            if (alreadyPaid) {
+                throw createErrorResponse("Esta fatura já foi paga.", 400)
+            }
+
             await tx.card.update({
                 where: { id: card_id },
                 data: { limite_disponivel: { increment: total } }
@@ -203,6 +207,31 @@ export class CardInvoiceService {
         const amountPaid = Number(payment.amount_paid)
 
         await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+            const card = await tx.card.findUnique({
+                where: { id: card_id },
+                select: { limite_disponivel: true, limite: true }
+            })
+
+            if (!card) throw createErrorResponse("Cartão não encontrado.", 404)
+
+            const limiteDisponivel = Number(card.limite_disponivel)
+            const limite = Number(card.limite)
+            const novoLimite = limiteDisponivel - amountPaid
+
+            if (novoLimite < 0) {
+                throw createErrorResponse(
+                    `Não é possível cancelar: o limite disponível ficaria negativo (R$ ${novoLimite.toFixed(2)}). Há despesas que reduziriam o limite abaixo de zero.`,
+                    400
+                )
+            }
+
+            if (novoLimite > limite) {
+                throw createErrorResponse(
+                    `Não é possível cancelar: o limite disponível ultrapassaria o limite do cartão.`,
+                    400
+                )
+            }
+
             await tx.card.update({
                 where: { id: card_id },
                 data: { limite_disponivel: { decrement: amountPaid } }

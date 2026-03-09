@@ -82,7 +82,6 @@ export class CardService {
             SELECT
                 c.*,
                 COALESCE(SUM(e.quantidade), 0) AS gasto_total,
-                COALESCE(SUM(CASE WHEN e.fixo = true THEN e.quantidade ELSE 0 END), 0) AS gasto_fixo,
                 CASE
                     WHEN CURRENT_DATE <= make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int, EXTRACT(MONTH FROM CURRENT_DATE)::int, c.dia_vencimento)
                     THEN make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int, EXTRACT(MONTH FROM CURRENT_DATE)::int, c.dia_vencimento)
@@ -100,11 +99,7 @@ export class CardService {
         return result.map(card => {
             const limite = Number(card.limite)
             const gastoTotal = Number(card.gasto_total)
-            const gastoFixo = Number(card.gasto_fixo)
-            const limiteDisponvelBanco = Number(card.limite_disponivel)
-            const limiteDisponivel = limiteDisponvelBanco - gastoFixo
-
-            console.log(`[getCardsByUser] Card ${card.nome}: limite=${limite}, limite_banco=${limiteDisponvelBanco}, gasto_fixo=${gastoFixo}, resultado=${limiteDisponivel}`)
+            const limiteDisponivel = Number(card.limite_disponivel)
 
             return {
                 ...card,
@@ -263,6 +258,53 @@ export class CardService {
             await tx.cardInvoicePayment.deleteMany({ where: { card_id: cardId, user_id: userId } })
             await tx.card.delete({ where: { id: cardId } })
         })
+    }
+
+    static async getFutureInstallments(cardId: number, userId: number): Promise<Array<{
+        id: number
+        tipo: string
+        quantidade: number
+        competencia_mes: number
+        competencia_ano: number
+        parcelas: number
+        observacoes: string | null
+    }>> {
+        const now = new Date()
+        const currentMonth = now.getMonth() + 1
+        const currentYear = now.getFullYear()
+
+        const card = await prisma.card.findFirst({
+            where: { id: cardId, user_id: userId }
+        })
+
+        if (!card) throw createErrorResponse("Cartão não encontrado.", 404)
+
+        const result = await prisma.$queryRaw<Array<{
+            id: number
+            tipo: string
+            quantidade: string
+            competencia_mes: number
+            competencia_ano: number
+            parcelas: number
+            observacoes: string | null
+        }>>`
+            SELECT id, tipo, quantidade, competencia_mes, competencia_ano, parcelas, observacoes
+            FROM expenses
+            WHERE card_id = ${cardId}
+              AND user_id = ${userId}
+              AND parcelas IS NOT NULL
+              AND fixo = false
+              AND (
+                  (competencia_ano > ${currentYear})
+                  OR (competencia_ano = ${currentYear} AND competencia_mes >= ${currentMonth})
+              )
+            ORDER BY competencia_ano ASC, competencia_mes ASC
+        `
+
+        return result.map(r => ({
+            ...r,
+            quantidade: Number(r.quantidade),
+        }))
     }
 
     static async getGastoTotal(cardId: number, userId: number): Promise<number> {

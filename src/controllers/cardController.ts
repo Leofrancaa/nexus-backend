@@ -15,6 +15,32 @@ import {
 } from '../utils/helper'
 
 /**
+ * GET /api/cards/:id/future-installments - Listar parcelas futuras do cartão
+ */
+export const getFutureInstallments = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+): Promise<void> => {
+    try {
+        const authReq = req as AuthenticatedRequest
+        const userId = authReq.user.id
+        const cardId = toNumber(req.params.id)
+
+        if (!cardId) {
+            sendErrorResponse(res, 'ID do cartão inválido.', 400)
+            return
+        }
+
+        const result = await CardService.getFutureInstallments(cardId, userId)
+        sendSuccessResponse(res, result, 'Parcelas futuras recuperadas com sucesso.')
+    } catch (error) {
+        const apiError = error as ApiError
+        sendErrorResponse(res, resolveUserMessage(error, 'Erro ao buscar parcelas futuras.'), apiError.status || 500, error)
+    }
+}
+
+/**
  * POST /api/cards - Criar cartão
  */
 export const createCard = async (

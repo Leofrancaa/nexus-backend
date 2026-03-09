@@ -1,6 +1,6 @@
 // src/routes/dashboardRoutes.ts
 import { Router } from 'express'
-import { getDashboardData } from '../controllers/dashboardController'
+import { getDashboardData, getHealthScore } from '../controllers/dashboardController'
 import { authenticateToken } from '../middlewares/authMiddleware'
 
 const router = Router()
@@ -10,5 +10,8 @@ router.use(authenticateToken)
 
 // GET /api/dashboard - Obter dados do dashboard
 router.get('/', getDashboardData)
+
+// GET /api/dashboard/health-score - Score de saúde financeira
+router.get('/health-score', getHealthScore)
 
 export default router

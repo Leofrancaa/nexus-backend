@@ -161,15 +161,16 @@ export class PlanService {
             }
         }
 
-        let newStatus = currentPlan.status
-        if (meta !== undefined && meta !== Number(currentPlan.meta)) {
-            const progresso = (Number(currentPlan.total_contribuido) / Number(meta)) * 100
+        const metaEfetiva = meta !== undefined ? Number(meta) : Number(currentPlan.meta)
+        const progresso = metaEfetiva > 0
+            ? (Number(currentPlan.total_contribuido) / metaEfetiva) * 100
+            : 0
 
-            if (progresso >= 100) newStatus = "Concluído"
-            else if (progresso >= 80) newStatus = "Quase lá"
-            else if (progresso > 0) newStatus = "Em progresso"
-            else newStatus = "Iniciando"
-        }
+        let newStatus: string
+        if (progresso >= 100) newStatus = "Concluído"
+        else if (progresso >= 80) newStatus = "Quase lá"
+        else if (progresso > 0) newStatus = "Em progresso"
+        else newStatus = "Iniciando"
 
         const result = await prisma.plan.update({
             where: { id: planId },
