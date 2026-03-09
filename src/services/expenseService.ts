@@ -1,5 +1,6 @@
 // src/services/expenseService.ts
 import prisma from '../database/prisma'
+import { Prisma } from '@prisma/client'
 import {
     Expense,
     CreateExpenseRequest,
@@ -379,35 +380,34 @@ export class ExpenseService {
         year: number,
         categoryId?: number
     ): Promise<{ total: number; fixas: number; transacoes: number; media: number }> {
-        try {
-            const result = await prisma.$queryRaw<Array<{
-                total: string
-                fixas: string
-                transacoes: bigint
-                media: string
-            }>>`
-                SELECT
-                    COALESCE(SUM(quantidade), 0) as total,
-                    COALESCE(SUM(CASE WHEN fixo = true THEN quantidade END), 0) as fixas,
-                    COUNT(*) as transacoes,
-                    CASE WHEN COUNT(*) > 0 THEN COALESCE(AVG(quantidade), 0) ELSE 0 END as media
-                FROM expenses
-                WHERE user_id = ${userId}
-                  AND EXTRACT(MONTH FROM data) = ${month}
-                  AND EXTRACT(YEAR FROM data) = ${year}
-                  ${categoryId ? prisma.$queryRaw`AND category_id = ${categoryId}` : prisma.$queryRaw``}
-            `
+        const categoryFilter = categoryId
+            ? Prisma.sql`AND category_id = ${categoryId}`
+            : Prisma.sql``
 
-            const stats = result[0]
-            return {
-                total: Number(stats.total || 0),
-                fixas: Number(stats.fixas || 0),
-                transacoes: Number(stats.transacoes || 0),
-                media: Number(stats.media || 0)
-            }
-        } catch (error) {
-            console.error('Erro em getExpenseStats:', error)
-            return { total: 0, fixas: 0, transacoes: 0, media: 0 }
+        const result = await prisma.$queryRaw<Array<{
+            total: string
+            fixas: string
+            transacoes: bigint
+            media: string
+        }>>`
+            SELECT
+                COALESCE(SUM(quantidade), 0) as total,
+                COALESCE(SUM(CASE WHEN fixo = true THEN quantidade END), 0) as fixas,
+                COUNT(*) as transacoes,
+                CASE WHEN COUNT(*) > 0 THEN COALESCE(AVG(quantidade), 0) ELSE 0 END as media
+            FROM expenses
+            WHERE user_id = ${userId}
+              AND EXTRACT(MONTH FROM data) = ${month}
+              AND EXTRACT(YEAR FROM data) = ${year}
+              ${categoryFilter}
+        `
+
+        const stats = result[0]
+        return {
+            total: Number(stats.total || 0),
+            fixas: Number(stats.fixas || 0),
+            transacoes: Number(stats.transacoes || 0),
+            media: Number(stats.media || 0)
         }
     }
 

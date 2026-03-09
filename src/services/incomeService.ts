@@ -1,4 +1,5 @@
 import prisma from '../database/prisma'
+import { Prisma } from '@prisma/client'
 import {
     Income,
     CreateIncomeRequest,
@@ -209,6 +210,10 @@ export class IncomeService {
         year: number,
         categoryId?: number | undefined
     ): Promise<IncomeStatsResult> {
+        const categoryFilter = categoryId
+            ? Prisma.sql`AND category_id = ${categoryId}`
+            : Prisma.sql``
+
         const result = await prisma.$queryRaw<Array<IncomeStatsResult>>`
             SELECT
                 COALESCE(SUM(quantidade), 0) AS total,
@@ -219,7 +224,7 @@ export class IncomeService {
             WHERE user_id = ${userId}
               AND EXTRACT(MONTH FROM data) = ${month}
               AND EXTRACT(YEAR FROM data) = ${year}
-              ${categoryId ? prisma.$queryRaw`AND category_id = ${categoryId}` : prisma.$queryRaw``}
+              ${categoryFilter}
         `
 
         return result[0]
