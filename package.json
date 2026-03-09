@@ -6,7 +6,8 @@
     "build": "tsc",
     "start": "node dist/src/app.js",
     "dev": "tsx watch api/index.ts",
-    "vercel-build": "echo 'Building for Vercel...'",
+    "postinstall": "prisma generate",
+    "vercel-build": "prisma generate",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

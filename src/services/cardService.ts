@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import prisma from '../database/prisma'
 import {
     Card,
@@ -254,7 +255,7 @@ export class CardService {
     }
 
     static async deleteCardAndExpenses(cardId: number, userId: number): Promise<void> {
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             const exists = await tx.card.findFirst({ where: { id: cardId, user_id: userId } })
             if (!exists) throw createErrorResponse("Cartão não encontrado.", 404)
 

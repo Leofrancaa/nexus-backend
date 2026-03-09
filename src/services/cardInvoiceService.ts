@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import prisma from '../database/prisma'
 import {
     addMonthsSafe,
@@ -80,7 +81,7 @@ export class CardInvoiceService {
 
         const total = Number(totalResult._sum.quantidade || 0)
 
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             await tx.card.update({
                 where: { id: card_id },
                 data: { limite_disponivel: { increment: total } }
@@ -201,7 +202,7 @@ export class CardInvoiceService {
 
         const amountPaid = Number(payment.amount_paid)
 
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             await tx.card.update({
                 where: { id: card_id },
                 data: { limite_disponivel: { decrement: amountPaid } }

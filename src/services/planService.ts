@@ -1,4 +1,5 @@
 // src/services/planService.ts
+import { Prisma } from '@prisma/client'
 import prisma from '../database/prisma'
 import {
     Plan,
@@ -185,7 +186,7 @@ export class PlanService {
     }
 
     static async deletePlan(planId: number, userId: number): Promise<{ message: string }> {
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             const plan = await tx.plan.findFirst({
                 where: { id: planId, user_id: userId }
             })
@@ -217,7 +218,7 @@ export class PlanService {
             throw createErrorResponse("Valor da contribuição deve ser positivo.", 400)
         }
 
-        return await prisma.$transaction(async (tx) => {
+        return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             const plan = await tx.plan.findFirst({
                 where: { id: planId, user_id: userId }
             })
@@ -287,7 +288,7 @@ export class PlanService {
         contributionId: number,
         userId: number
     ): Promise<{ message: string; updated_plan: Plan }> {
-        return await prisma.$transaction(async (tx) => {
+        return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             const contribution = await tx.planContribution.findFirst({
                 where: { id: contributionId, user_id: userId }
             })
