@@ -10,7 +10,8 @@ import {
     sendSuccessResponse,
     toNumber,
     isPositiveNumber,
-    isValidHexColor
+    isValidHexColor,
+    resolveUserMessage
 } from '../utils/helper'
 
 /**
@@ -95,7 +96,7 @@ export const createCard = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao criar cartão.',
+            resolveUserMessage(error, 'Erro ao criar cartão.'),
             apiError.status || 500,
             apiError
         )
@@ -191,7 +192,7 @@ export const updateCard = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao atualizar cartão.',
+            resolveUserMessage(error, 'Erro ao atualizar cartão.'),
             apiError.status || 500,
             apiError
         )
@@ -224,7 +225,7 @@ export const deleteCard = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao deletar cartão.',
+            resolveUserMessage(error, 'Erro ao deletar cartão.'),
             apiError.status || 500,
             apiError
         )

@@ -10,7 +10,8 @@ import {
     sendErrorResponse,
     sendSuccessResponse,
     toNumber,
-    isPositiveNumber
+    isPositiveNumber,
+    resolveUserMessage
 } from '../utils/helper'
 
 /**
@@ -34,7 +35,7 @@ export const createPlan = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao criar plano.',
+            resolveUserMessage(error, 'Erro ao criar plano.'),
             apiError.status || 500,
             apiError
         )
@@ -119,7 +120,7 @@ export const updatePlan = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao atualizar plano.',
+            resolveUserMessage(error, 'Erro ao atualizar plano.'),
             apiError.status || 500,
             apiError
         )
@@ -152,7 +153,7 @@ export const deletePlan = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao deletar plano.',
+            resolveUserMessage(error, 'Erro ao deletar plano.'),
             apiError.status || 500,
             apiError
         )
@@ -191,7 +192,7 @@ export const addContribution = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao adicionar contribuição.',
+            resolveUserMessage(error, 'Erro ao adicionar contribuição.'),
             apiError.status || 500,
             apiError
         )
@@ -225,7 +226,7 @@ export const getPlanContributions = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao buscar contribuições.',
+            resolveUserMessage(error, 'Erro ao buscar contribuições.'),
             apiError.status || 500,
             apiError
         )
@@ -258,7 +259,7 @@ export const removeContribution = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao remover contribuição.',
+            resolveUserMessage(error, 'Erro ao remover contribuição.'),
             apiError.status || 500,
             apiError
         )

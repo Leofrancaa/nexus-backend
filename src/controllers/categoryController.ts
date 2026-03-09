@@ -8,7 +8,8 @@ import {
 import {
     sendErrorResponse,
     sendSuccessResponse,
-    toNumber
+    toNumber,
+    resolveUserMessage
 } from '../utils/helper'
 
 /**
@@ -32,7 +33,7 @@ export const createCategory = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao criar categoria.',
+            resolveUserMessage(error, 'Erro ao criar categoria.'),
             apiError.status || 500,
             apiError
         )
@@ -138,7 +139,7 @@ export const updateCategory = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao atualizar categoria.',
+            resolveUserMessage(error, 'Erro ao atualizar categoria.'),
             apiError.status || 500,
             apiError
         )
@@ -171,7 +172,7 @@ export const deleteCategory = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao deletar categoria.',
+            resolveUserMessage(error, 'Erro ao deletar categoria.'),
             apiError.status || 500,
             apiError
         )

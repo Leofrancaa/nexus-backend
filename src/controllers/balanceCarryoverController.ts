@@ -2,7 +2,7 @@
 import { Request, Response, NextFunction } from 'express'
 import { BalanceCarryoverService } from '../services/balanceCarryoverService'
 import { AuthenticatedRequest } from '../types/index'
-import { sendErrorResponse, sendSuccessResponse, toNumber } from '../utils/helper'
+import { sendErrorResponse, sendSuccessResponse, toNumber, resolveUserMessage } from '../utils/helper'
 
 /**
  * GET /api/balance/carryover/check?mes=X&ano=Y
@@ -55,10 +55,11 @@ export const applyCarryover = async (req: Request, res: Response, next: NextFunc
             : `Débito de R$ ${Math.abs(result.saldo).toFixed(2)} transferido como despesa em ${mes}/${ano}.`
 
         sendSuccessResponse(res, result, msg, 201)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Erro ao aplicar carryover:', error)
-        const status = error?.statusCode || 500
-        sendErrorResponse(res, error?.message || 'Erro ao aplicar saldo anterior.', status, error)
+        const apiError = error as { statusCode?: number; status?: number }
+        const status = apiError?.statusCode || apiError?.status || 500
+        sendErrorResponse(res, resolveUserMessage(error, 'Erro ao aplicar saldo anterior.'), status, error)
     }
 }
 
@@ -81,10 +82,11 @@ export const undoCarryover = async (req: Request, res: Response, next: NextFunct
 
         await BalanceCarryoverService.undo(userId, mes, ano)
         sendSuccessResponse(res, null, 'Carryover removido com sucesso.')
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Erro ao desfazer carryover:', error)
-        const status = error?.statusCode || 500
-        sendErrorResponse(res, error?.message || 'Erro ao remover saldo anterior.', status, error)
+        const apiError = error as { statusCode?: number; status?: number }
+        const status = apiError?.statusCode || apiError?.status || 500
+        sendErrorResponse(res, resolveUserMessage(error, 'Erro ao remover saldo anterior.'), status, error)
     }
 }
 

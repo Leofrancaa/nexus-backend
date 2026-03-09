@@ -7,7 +7,8 @@ import {
 import {
     sendErrorResponse,
     sendSuccessResponse,
-    toNumber
+    toNumber,
+    resolveUserMessage
 } from '../utils/helper'
 
 /**
@@ -56,7 +57,7 @@ export const updateCurrency = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao atualizar moeda.',
+            resolveUserMessage(error, 'Erro ao atualizar moeda.'),
             apiError.status || 500,
             apiError
         )
@@ -114,7 +115,7 @@ export const convertCurrency = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao converter moeda.',
+            resolveUserMessage(error, 'Erro ao converter moeda.'),
             apiError.status || 500,
             apiError
         )

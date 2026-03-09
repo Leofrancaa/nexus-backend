@@ -133,6 +133,18 @@ export const createSuccessResponse = <T>(
 }
 
 /**
+ * Extrai mensagem segura para o usuário a partir de um erro.
+ * Erros com `.status` são erros conhecidos/esperados (criados por createErrorResponse)
+ * e possuem mensagens amigáveis. Erros sem `.status` são técnicos (Prisma, DB) e
+ * não devem ser expostos ao usuário.
+ */
+export const resolveUserMessage = (error: unknown, fallback: string): string => {
+    const apiError = error as ApiError
+    if (apiError?.status && apiError?.message) return apiError.message
+    return fallback
+}
+
+/**
  * Envia resposta de erro HTTP
  */
 export const sendErrorResponse = (

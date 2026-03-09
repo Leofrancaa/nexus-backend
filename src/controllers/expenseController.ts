@@ -13,7 +13,8 @@ import {
     sendSuccessResponse,
     toNumber,
     isPositiveNumber,
-    formatDatesInObject
+    formatDatesInObject,
+    resolveUserMessage
 } from '../utils/helper'
 
 /**
@@ -59,7 +60,7 @@ export const createExpense = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao criar despesa.',
+            resolveUserMessage(error, 'Erro ao criar despesa.'),
             apiError.status || 500,
             apiError
         )
@@ -149,7 +150,7 @@ export const updateExpense = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao atualizar despesa.',
+            resolveUserMessage(error, 'Erro ao atualizar despesa.'),
             apiError.status || 500,
             apiError
         )
@@ -187,7 +188,7 @@ export const deleteExpense = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao deletar despesa.',
+            resolveUserMessage(error, 'Erro ao deletar despesa.'),
             apiError.status || 500,
             apiError
         )

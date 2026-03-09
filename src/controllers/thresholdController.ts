@@ -9,7 +9,8 @@ import {
     sendErrorResponse,
     sendSuccessResponse,
     toNumber,
-    isPositiveNumber
+    isPositiveNumber,
+    resolveUserMessage
 } from '../utils/helper'
 
 /**
@@ -44,7 +45,7 @@ export const createThreshold = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao criar limite.',
+            resolveUserMessage(error, 'Erro ao criar limite.'),
             apiError.status || 500,
             apiError
         )
@@ -135,7 +136,7 @@ export const updateThreshold = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao atualizar limite.',
+            resolveUserMessage(error, 'Erro ao atualizar limite.'),
             apiError.status || 500,
             apiError
         )
@@ -168,7 +169,7 @@ export const deleteThreshold = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao deletar limite.',
+            resolveUserMessage(error, 'Erro ao deletar limite.'),
             apiError.status || 500,
             apiError
         )

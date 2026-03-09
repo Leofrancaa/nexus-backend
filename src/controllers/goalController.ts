@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
 import { GoalService } from '../services/goalService'
 import { AuthenticatedRequest, ApiError } from '../types/index'
-import { sendErrorResponse, sendSuccessResponse, toNumber, isPositiveNumber } from '../utils/helper'
+import { sendErrorResponse, sendSuccessResponse, toNumber, isPositiveNumber, resolveUserMessage } from '../utils/helper'
 
 /**
  * POST /api/goals - Criar nova meta de receita mensal
@@ -35,7 +35,7 @@ export const createGoal = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao criar meta.',
+            resolveUserMessage(error, 'Erro ao criar meta.'),
             apiError.status || 500,
             apiError
         )
@@ -129,7 +129,7 @@ export const updateGoal = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao atualizar meta.',
+            resolveUserMessage(error, 'Erro ao atualizar meta.'),
             apiError.status || 500,
             apiError
         )
@@ -162,7 +162,7 @@ export const deleteGoal = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao remover meta.',
+            resolveUserMessage(error, 'Erro ao remover meta.'),
             apiError.status || 500,
             apiError
         )

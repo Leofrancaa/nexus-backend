@@ -10,7 +10,8 @@ import {
     sendSuccessResponse,
     toNumber,
     isPositiveNumber,
-    formatDatesInObject
+    formatDatesInObject,
+    resolveUserMessage
 } from '../utils/helper'
 
 /**
@@ -50,7 +51,7 @@ export const createIncome = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao criar receita.',
+            resolveUserMessage(error, 'Erro ao criar receita.'),
             apiError.status || 500,
             apiError
         )
@@ -137,7 +138,7 @@ export const updateIncome = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao atualizar receita.',
+            resolveUserMessage(error, 'Erro ao atualizar receita.'),
             apiError.status || 500,
             apiError
         )
@@ -175,7 +176,7 @@ export const deleteIncome = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao deletar receita.',
+            resolveUserMessage(error, 'Erro ao deletar receita.'),
             apiError.status || 500,
             apiError
         )

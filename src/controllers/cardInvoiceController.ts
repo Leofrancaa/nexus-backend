@@ -7,7 +7,8 @@ import {
 import {
     sendErrorResponse,
     sendSuccessResponse,
-    toNumber
+    toNumber,
+    resolveUserMessage
 } from '../utils/helper'
 
 /**
@@ -51,7 +52,7 @@ export const payInvoice = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao pagar fatura.',
+            resolveUserMessage(error, 'Erro ao pagar fatura.'),
             apiError.status || 500,
             apiError
         )
@@ -84,7 +85,7 @@ export const getAvailableInvoices = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao buscar faturas.',
+            resolveUserMessage(error, 'Erro ao buscar faturas.'),
             apiError.status || 500,
             apiError
         )
@@ -156,7 +157,7 @@ export const cancelInvoicePayment = async (
         const apiError = error as ApiError
         sendErrorResponse(
             res,
-            apiError.message || 'Erro ao cancelar pagamento.',
+            resolveUserMessage(error, 'Erro ao cancelar pagamento.'),
             apiError.status || 500,
             apiError
         )
