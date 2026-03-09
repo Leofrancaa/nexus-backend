@@ -54,8 +54,8 @@ export const getGoals = async (
         const authReq = req as AuthenticatedRequest
         const userId = authReq.user.id
 
-        const mes = req.query.mes ? toNumber(req.query.mes as string) : undefined
-        const ano = req.query.ano ? toNumber(req.query.ano as string) : undefined
+        const mes = req.query.mes ? toNumber(req.query.mes as string) ?? undefined : undefined
+        const ano = req.query.ano ? toNumber(req.query.ano as string) ?? undefined : undefined
 
         const goals = await GoalService.getGoalsByUser(userId, mes, ano)
         sendSuccessResponse(res, goals, 'Metas recuperadas com sucesso.')
@@ -181,8 +181,8 @@ export const getGoalStats = async (
         const authReq = req as AuthenticatedRequest
         const userId = authReq.user.id
 
-        const mes = req.query.mes ? toNumber(req.query.mes as string) : undefined
-        const ano = req.query.ano ? toNumber(req.query.ano as string) : undefined
+        const mes = req.query.mes ? toNumber(req.query.mes as string) ?? undefined : undefined
+        const ano = req.query.ano ? toNumber(req.query.ano as string) ?? undefined : undefined
 
         const stats = await GoalService.getGoalStats(userId, mes, ano)
         sendSuccessResponse(res, stats, 'Estatísticas recuperadas com sucesso.')

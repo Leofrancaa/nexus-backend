@@ -38,9 +38,11 @@ export interface RegisterRequest {
     nome: string
     email: string
     senha: string
+    inviteCode?: string
 }
 
 export interface AuthResponse {
+    success?: boolean
     message: string
     user: Omit<User, 'senha'>
     token: string

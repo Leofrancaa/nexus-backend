@@ -56,7 +56,7 @@ export const formatDateFromDB = (dateValue: string | Date | null): string => {
  * Formata todas as datas de um objeto do banco
  */
 export const formatDatesInObject = <T extends Record<string, any>>(obj: T): T => {
-    const formatted = { ...obj }
+    const formatted: Record<string, any> = { ...obj }
 
     // Campos de data conhecidos que devem ser formatados
     const dateFields = ['data', 'prazo', 'created_at', 'updated_at']
@@ -67,7 +67,7 @@ export const formatDatesInObject = <T extends Record<string, any>>(obj: T): T =>
         }
     }
 
-    return formatted
+    return formatted as T
 }
 
 /**

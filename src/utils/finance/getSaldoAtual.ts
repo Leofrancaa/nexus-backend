@@ -1,23 +1,11 @@
 // src/utils/finance/getSaldoAtual.ts
-import { DatabaseUtils } from '../database'
-
-interface SaldoQueryResult {
-    total: string
-}
+import prisma from '../../database/prisma'
 
 export const getSaldoAtual = async (user_id: number): Promise<number> => {
-    const receitas = await DatabaseUtils.findOne<SaldoQueryResult>(
-        `SELECT COALESCE(SUM(quantidade), 0) as total FROM incomes WHERE user_id = $1`,
-        [user_id]
-    )
+    const [receitas, despesas] = await Promise.all([
+        prisma.income.aggregate({ where: { user_id }, _sum: { quantidade: true } }),
+        prisma.expense.aggregate({ where: { user_id }, _sum: { quantidade: true } }),
+    ])
 
-    const despesas = await DatabaseUtils.findOne<SaldoQueryResult>(
-        `SELECT COALESCE(SUM(quantidade), 0) as total FROM expenses WHERE user_id = $1`,
-        [user_id]
-    )
-
-    const totalReceitas = parseFloat(receitas?.total || '0')
-    const totalDespesas = parseFloat(despesas?.total || '0')
-
-    return totalReceitas - totalDespesas
+    return Number(receitas._sum.quantidade ?? 0) - Number(despesas._sum.quantidade ?? 0)
 }

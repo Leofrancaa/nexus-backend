@@ -1,16 +1,12 @@
-import { pool } from '../database/index'
+import prisma from '../database/prisma'
 import { DashboardData } from '../types/index'
 
 export class DashboardService {
-    /**
-     * Busca todos os dados do dashboard
-     */
     static async getDashboardData(userId: number): Promise<DashboardData> {
         const now = new Date()
         const mes = now.getMonth() + 1
         const ano = now.getFullYear()
 
-        // Executar todas as queries em paralelo para melhor performance
         const [
             saldo,
             saldoFuturo,
@@ -52,73 +48,52 @@ export class DashboardService {
         }
     }
 
-    /**
-     * Calcula saldo atual (receitas - despesas)
-     */
     private static async getSaldoAtual(userId: number): Promise<number> {
-        const result = await pool.query(
-            `SELECT 
-        COALESCE(
-          (SELECT SUM(quantidade) FROM incomes WHERE user_id = $1), 0
-        ) - 
-        COALESCE(
-          (SELECT SUM(quantidade) FROM expenses WHERE user_id = $1), 0
-        ) AS saldo`,
-            [userId]
-        )
+        const result = await prisma.$queryRaw<Array<{ saldo: string }>>`
+            SELECT
+                COALESCE((SELECT SUM(quantidade) FROM incomes WHERE user_id = ${userId}), 0) -
+                COALESCE((SELECT SUM(quantidade) FROM expenses WHERE user_id = ${userId}), 0) AS saldo
+        `
 
-        return Number(result.rows[0].saldo || 0)
+        return Number(result[0].saldo || 0)
     }
 
-    /**
-     * Calcula saldo futuro considerando parcelas pendentes
-     */
     private static async getSaldoFuturo(userId: number): Promise<number> {
         const today = new Date().toISOString().split('T')[0]
 
-        const result = await pool.query(
-            `SELECT 
-        COALESCE(
-          (SELECT SUM(quantidade) FROM incomes WHERE user_id = $1), 0
-        ) - 
-        COALESCE(
-          (SELECT SUM(quantidade) FROM expenses WHERE user_id = $1 AND data >= $2), 0
-        ) AS saldo_futuro`,
-            [userId, today]
-        )
+        const result = await prisma.$queryRaw<Array<{ saldo_futuro: string }>>`
+            SELECT
+                COALESCE((SELECT SUM(quantidade) FROM incomes WHERE user_id = ${userId}), 0) -
+                COALESCE((SELECT SUM(quantidade) FROM expenses WHERE user_id = ${userId} AND data >= ${new Date(today)}), 0) AS saldo_futuro
+        `
 
-        return Number(result.rows[0].saldo_futuro || 0)
+        return Number(result[0].saldo_futuro || 0)
     }
 
-    /**
-     * Busca totais mensais do ano
-     */
     private static async getTotaisMensais(userId: number, ano: number): Promise<Array<{
         mes: number
         receitas: number
         despesas: number
     }>> {
-        const receitas = await pool.query(
-            `SELECT EXTRACT(MONTH FROM data) as mes, SUM(quantidade) as total
-       FROM incomes
-       WHERE user_id = $1 AND EXTRACT(YEAR FROM data) = $2
-       GROUP BY mes ORDER BY mes`,
-            [userId, ano]
-        )
+        const [receitas, despesas] = await Promise.all([
+            prisma.$queryRaw<Array<{ mes: number; total: string }>>`
+                SELECT EXTRACT(MONTH FROM data) as mes, SUM(quantidade) as total
+                FROM incomes
+                WHERE user_id = ${userId} AND EXTRACT(YEAR FROM data) = ${ano}
+                GROUP BY mes ORDER BY mes
+            `,
+            prisma.$queryRaw<Array<{ mes: number; total: string }>>`
+                SELECT EXTRACT(MONTH FROM data) as mes, SUM(quantidade) as total
+                FROM expenses
+                WHERE user_id = ${userId} AND EXTRACT(YEAR FROM data) = ${ano}
+                GROUP BY mes ORDER BY mes
+            `,
+        ])
 
-        const despesas = await pool.query(
-            `SELECT EXTRACT(MONTH FROM data) as mes, SUM(quantidade) as total
-       FROM expenses
-       WHERE user_id = $1 AND EXTRACT(YEAR FROM data) = $2
-       GROUP BY mes ORDER BY mes`,
-            [userId, ano]
-        )
-
-        // Criar array de 12 meses
-        const result = Array.from({ length: 12 }, (_, i) => {
+        return Array.from({ length: 12 }, (_, i) => {
             const mes = i + 1
-            const receitaMes = receitas.rows.find(r => Number(r.mes) === mes)
-            const despesaMes = despesas.rows.find(d => Number(d.mes) === mes)
+            const receitaMes = receitas.find(r => Number(r.mes) === mes)
+            const despesaMes = despesas.find(d => Number(d.mes) === mes)
 
             return {
                 mes,
@@ -126,67 +101,40 @@ export class DashboardService {
                 despesas: Number(despesaMes?.total || 0)
             }
         })
-
-        return result
     }
 
-    /**
-     * Busca resumo anual detalhado
-     */
     private static async getResumoAnual(userId: number, ano: number): Promise<Array<{
         mes: string
         total_receitas: number
         total_despesas: number
     }>> {
-        const receitasQuery = await pool.query(
-            `SELECT 
-        EXTRACT(MONTH FROM data) AS mes,
-        SUM(quantidade) AS total_receitas
-       FROM incomes
-       WHERE user_id = $1 AND EXTRACT(YEAR FROM data) = $2
-       GROUP BY mes
-       ORDER BY mes`,
-            [userId, ano]
-        )
+        const [receitasQuery, despesasQuery] = await Promise.all([
+            prisma.$queryRaw<Array<{ mes: number; total_receitas: string }>>`
+                SELECT EXTRACT(MONTH FROM data) AS mes, SUM(quantidade) AS total_receitas
+                FROM incomes
+                WHERE user_id = ${userId} AND EXTRACT(YEAR FROM data) = ${ano}
+                GROUP BY mes ORDER BY mes
+            `,
+            prisma.$queryRaw<Array<{ mes: number; total_despesas: string }>>`
+                SELECT EXTRACT(MONTH FROM data) AS mes, SUM(quantidade) AS total_despesas
+                FROM expenses
+                WHERE user_id = ${userId} AND EXTRACT(YEAR FROM data) = ${ano}
+                GROUP BY mes ORDER BY mes
+            `,
+        ])
 
-        const despesasQuery = await pool.query(
-            `SELECT 
-        EXTRACT(MONTH FROM data) AS mes,
-        SUM(quantidade) AS total_despesas
-       FROM expenses
-       WHERE user_id = $1 AND EXTRACT(YEAR FROM data) = $2
-       GROUP BY mes
-       ORDER BY mes`,
-            [userId, ano]
-        )
+        const receitasMap = Object.fromEntries(receitasQuery.map(r => [r.mes, parseFloat(r.total_receitas)]))
+        const despesasMap = Object.fromEntries(despesasQuery.map(d => [d.mes, parseFloat(d.total_despesas)]))
 
-        // Mapear os resultados em objetos indexados por mês
-        const receitasMap = Object.fromEntries(
-            receitasQuery.rows.map(r => [r.mes, parseFloat(r.total_receitas)])
-        )
-        const despesasMap = Object.fromEntries(
-            despesasQuery.rows.map(d => [d.mes, parseFloat(d.total_despesas)])
-        )
+        const mesesNomes = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
 
-        // Meses de 1 a 12
-        const mesesNomes = [
-            "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
-            "Jul", "Ago", "Set", "Out", "Nov", "Dez"
-        ]
-
-        return Array.from({ length: 12 }, (_, i) => {
-            const mes = i + 1
-            return {
-                mes: mesesNomes[i],
-                total_receitas: receitasMap[mes] || 0,
-                total_despesas: despesasMap[mes] || 0
-            }
-        })
+        return Array.from({ length: 12 }, (_, i) => ({
+            mes: mesesNomes[i],
+            total_receitas: receitasMap[i + 1] || 0,
+            total_despesas: despesasMap[i + 1] || 0
+        }))
     }
 
-    /**
-     * Comparativo mensal (atual vs anterior)
-     */
     private static async getComparativoMensal(
         userId: number,
         mesAtual: number,
@@ -199,119 +147,76 @@ export class DashboardService {
         const anoAnterior = mesAtual === 1 ? anoAtual - 1 : anoAtual
 
         const [receitaAtual, receitaAnterior, despesaAtual, despesaAnterior] = await Promise.all([
-            pool.query(
-                'SELECT COALESCE(SUM(quantidade), 0) as total FROM incomes WHERE user_id = $1 AND EXTRACT(MONTH FROM data) = $2 AND EXTRACT(YEAR FROM data) = $3',
-                [userId, mesAtual, anoAtual]
-            ),
-            pool.query(
-                'SELECT COALESCE(SUM(quantidade), 0) as total FROM incomes WHERE user_id = $1 AND EXTRACT(MONTH FROM data) = $2 AND EXTRACT(YEAR FROM data) = $3',
-                [userId, mesAnterior, anoAnterior]
-            ),
-            pool.query(
-                'SELECT COALESCE(SUM(quantidade), 0) as total FROM expenses WHERE user_id = $1 AND EXTRACT(MONTH FROM data) = $2 AND EXTRACT(YEAR FROM data) = $3',
-                [userId, mesAtual, anoAtual]
-            ),
-            pool.query(
-                'SELECT COALESCE(SUM(quantidade), 0) as total FROM expenses WHERE user_id = $1 AND EXTRACT(MONTH FROM data) = $2 AND EXTRACT(YEAR FROM data) = $3',
-                [userId, mesAnterior, anoAnterior]
-            )
+            prisma.$queryRaw<Array<{ total: string }>>`SELECT COALESCE(SUM(quantidade), 0) as total FROM incomes WHERE user_id = ${userId} AND EXTRACT(MONTH FROM data) = ${mesAtual} AND EXTRACT(YEAR FROM data) = ${anoAtual}`,
+            prisma.$queryRaw<Array<{ total: string }>>`SELECT COALESCE(SUM(quantidade), 0) as total FROM incomes WHERE user_id = ${userId} AND EXTRACT(MONTH FROM data) = ${mesAnterior} AND EXTRACT(YEAR FROM data) = ${anoAnterior}`,
+            prisma.$queryRaw<Array<{ total: string }>>`SELECT COALESCE(SUM(quantidade), 0) as total FROM expenses WHERE user_id = ${userId} AND EXTRACT(MONTH FROM data) = ${mesAtual} AND EXTRACT(YEAR FROM data) = ${anoAtual}`,
+            prisma.$queryRaw<Array<{ total: string }>>`SELECT COALESCE(SUM(quantidade), 0) as total FROM expenses WHERE user_id = ${userId} AND EXTRACT(MONTH FROM data) = ${mesAnterior} AND EXTRACT(YEAR FROM data) = ${anoAnterior}`,
         ])
 
         return {
-            receitas: {
-                atual: Number(receitaAtual.rows[0].total),
-                anterior: Number(receitaAnterior.rows[0].total)
-            },
-            despesas: {
-                atual: Number(despesaAtual.rows[0].total),
-                anterior: Number(despesaAnterior.rows[0].total)
-            }
+            receitas: { atual: Number(receitaAtual[0].total), anterior: Number(receitaAnterior[0].total) },
+            despesas: { atual: Number(despesaAtual[0].total), anterior: Number(despesaAnterior[0].total) }
         }
     }
 
-    /**
-     * Gastos por categoria no mês
-     */
     private static async getGastosPorCategoria(
         userId: number,
         mes: number,
         ano: number
     ): Promise<Array<{ id: number; nome: string; total: number }>> {
-        const result = await pool.query(
-            `SELECT c.id, c.nome, SUM(e.quantidade) as total
-       FROM expenses e
-       JOIN categories c ON e.category_id = c.id
-       WHERE e.user_id = $1
-         AND EXTRACT(MONTH FROM e.data) = $2
-         AND EXTRACT(YEAR FROM e.data) = $3
-       GROUP BY c.id, c.nome
-       ORDER BY total DESC`,
-            [userId, mes, ano]
-        )
+        const result = await prisma.$queryRaw<Array<{ id: number; nome: string; total: string }>>`
+            SELECT c.id, c.nome, SUM(e.quantidade) as total
+            FROM expenses e
+            JOIN categories c ON e.category_id = c.id
+            WHERE e.user_id = ${userId}
+              AND EXTRACT(MONTH FROM e.data) = ${mes}
+              AND EXTRACT(YEAR FROM e.data) = ${ano}
+            GROUP BY c.id, c.nome
+            ORDER BY total DESC
+        `
 
-        return result.rows.map(row => ({
-            id: row.id,
-            nome: row.nome,
-            total: Number(row.total)
-        }))
+        return result.map(row => ({ id: row.id, nome: row.nome, total: Number(row.total) }))
     }
 
-    /**
-     * Top 5 categorias com maior gasto
-     */
     private static async getTopCategoriasGasto(
         userId: number,
         mes: number,
         ano: number
     ): Promise<Array<{ nome: string; total: number }>> {
-        const result = await pool.query(
-            `SELECT c.nome, SUM(e.quantidade) AS total
-       FROM expenses e
-       JOIN categories c ON e.category_id = c.id
-       WHERE e.user_id = $1
-         AND EXTRACT(MONTH FROM e.data) = $2
-         AND EXTRACT(YEAR FROM e.data) = $3
-       GROUP BY c.nome
-       ORDER BY total DESC
-       LIMIT 5`,
-            [userId, mes, ano]
-        )
+        const result = await prisma.$queryRaw<Array<{ nome: string; total: string }>>`
+            SELECT c.nome, SUM(e.quantidade) AS total
+            FROM expenses e
+            JOIN categories c ON e.category_id = c.id
+            WHERE e.user_id = ${userId}
+              AND EXTRACT(MONTH FROM e.data) = ${mes}
+              AND EXTRACT(YEAR FROM e.data) = ${ano}
+            GROUP BY c.nome
+            ORDER BY total DESC
+            LIMIT 5
+        `
 
-        return result.rows.map(row => ({
-            nome: row.nome,
-            total: Number(row.total)
-        }))
+        return result.map(row => ({ nome: row.nome, total: Number(row.total) }))
     }
 
-    /**
-     * Gastos por cartão no mês
-     */
     private static async getGastosPorCartao(
         userId: number,
         mes: number,
         ano: number
     ): Promise<Array<{ cartao: string; total: number }>> {
-        const result = await pool.query(
-            `SELECT c.nome AS cartao, SUM(e.quantidade) AS total
-       FROM expenses e
-       JOIN cards c ON e.card_id = c.id
-       WHERE e.user_id = $1
-         AND EXTRACT(MONTH FROM e.data) = $2
-         AND EXTRACT(YEAR FROM e.data) = $3
-       GROUP BY c.nome
-       ORDER BY total DESC`,
-            [userId, mes, ano]
-        )
+        const result = await prisma.$queryRaw<Array<{ cartao: string; total: string }>>`
+            SELECT c.nome AS cartao, SUM(e.quantidade) AS total
+            FROM expenses e
+            JOIN cards c ON e.card_id = c.id
+            WHERE e.user_id = ${userId}
+              AND EXTRACT(MONTH FROM e.data) = ${mes}
+              AND EXTRACT(YEAR FROM e.data) = ${ano}
+            GROUP BY c.nome
+            ORDER BY total DESC
+        `
 
-        return result.rows.map(row => ({
-            cartao: row.cartao,
-            total: Number(row.total)
-        }))
+        return result.map(row => ({ cartao: row.cartao, total: Number(row.total) }))
     }
 
-    /**
-     * Parcelas pendentes (despesas futuras parceladas)
-     */
     private static async getParcelasPendentes(userId: number): Promise<Array<{
         id: number
         tipo: string
@@ -319,55 +224,42 @@ export class DashboardService {
         data: string
         parcelas: number
     }>> {
-        const today = new Date().toISOString().split('T')[0]
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
 
-        const result = await pool.query(
-            `SELECT * FROM expenses
-       WHERE user_id = $1
-         AND parcelas IS NOT NULL
-         AND data >= $2
-       ORDER BY data ASC`,
-            [userId, today]
-        )
+        const expenses = await prisma.expense.findMany({
+            where: {
+                user_id: userId,
+                parcelas: { not: null },
+                data: { gte: today }
+            },
+            orderBy: { data: 'asc' }
+        })
 
-        return result.rows.map(row => ({
+        return expenses.map(row => ({
             id: row.id,
             tipo: row.tipo,
             quantidade: Number(row.quantidade),
-            data: row.data.toISOString().split('T')[0],
-            parcelas: row.parcelas
+            data: row.data instanceof Date ? row.data.toISOString().split('T')[0] : String(row.data),
+            parcelas: row.parcelas!
         }))
     }
 
-    /**
-     * Cartões com limite baixo (estourados)
-     */
     private static async getCartoesEstourados(userId: number): Promise<Array<{
         id: number
         nome: string
         limite: number
     }>> {
-        const result = await pool.query(
-            `SELECT 
-          c.id, 
-          c.nome, 
-          c.limite 
-         FROM cards c
-         WHERE c.user_id = $1 AND c.limite_disponivel <= (c.limite * 0.1)
-         ORDER BY c.limite_disponivel ASC`,
-            [userId]
-        )
+        const result = await prisma.$queryRaw<Array<{ id: number; nome: string; limite: string }>>`
+            SELECT c.id, c.nome, c.limite
+            FROM cards c
+            WHERE c.user_id = ${userId} AND c.limite_disponivel <= (c.limite * 0.1)
+            ORDER BY c.limite_disponivel ASC
+        `
 
-        return result.rows.map(row => ({
-            id: row.id,
-            nome: row.nome,
-            limite: Number(row.limite)
-        }))
+        return result.map(row => ({ id: row.id, nome: row.nome, limite: Number(row.limite) }))
     }
 
-    /**
-     * Cartões com vencimento próximo (próximos 7 dias)
-     */
     private static async getCartoesAVencer(userId: number): Promise<Array<{
         id: number
         nome: string
@@ -378,29 +270,31 @@ export class DashboardService {
         const hoje = new Date()
         const diaHoje = hoje.getDate()
 
-        // Gerar array dos próximos 7 dias
-        const dias = []
+        const dias: number[] = []
         for (let i = 0; i <= 7; i++) {
             const dataTemp = new Date(hoje)
             dataTemp.setDate(diaHoje + i)
             dias.push(dataTemp.getDate())
         }
 
-        const result = await pool.query(
-            `SELECT 
-        c.id, 
-        c.nome, 
-        c.limite,
-        (SELECT COALESCE(SUM(quantidade), 0) 
-         FROM expenses 
-         WHERE card_id = c.id AND user_id = $1) AS total_gasto,
-        c.dia_vencimento
-       FROM cards c
-       WHERE c.user_id = $1 AND c.dia_vencimento = ANY($2::int[])`,
-            [userId, dias]
-        )
+        const result = await prisma.$queryRaw<Array<{
+            id: number
+            nome: string
+            limite: string
+            total_gasto: string
+            dia_vencimento: number
+        }>>`
+            SELECT
+                c.id,
+                c.nome,
+                c.limite,
+                (SELECT COALESCE(SUM(quantidade), 0) FROM expenses WHERE card_id = c.id AND user_id = ${userId}) AS total_gasto,
+                c.dia_vencimento
+            FROM cards c
+            WHERE c.user_id = ${userId} AND c.dia_vencimento = ANY(${dias}::int[])
+        `
 
-        return result.rows.map(row => ({
+        return result.map(row => ({
             id: row.id,
             nome: row.nome,
             limite: Number(row.limite),
@@ -409,9 +303,6 @@ export class DashboardService {
         }))
     }
 
-    /**
-     * Estatísticas rápidas do dashboard
-     */
     static async getQuickStats(userId: number): Promise<{
         saldo_atual: number
         receitas_mes: number
@@ -425,59 +316,26 @@ export class DashboardService {
         const mes = now.getMonth() + 1
         const ano = now.getFullYear()
 
-        const result = await pool.query(
-            `SELECT 
-        -- Saldo atual
-        COALESCE(
-          (SELECT SUM(quantidade) FROM incomes WHERE user_id = $1), 0
-        ) - 
-        COALESCE(
-          (SELECT SUM(quantidade) FROM expenses WHERE user_id = $1), 0
-        ) AS saldo_atual,
-        
-        -- Receitas do mês
-        COALESCE(
-          (SELECT SUM(quantidade) FROM incomes 
-           WHERE user_id = $1 
-             AND EXTRACT(MONTH FROM data) = $2 
-             AND EXTRACT(YEAR FROM data) = $3), 0
-        ) AS receitas_mes,
-        
-        -- Despesas do mês
-        COALESCE(
-          (SELECT SUM(quantidade) FROM expenses 
-           WHERE user_id = $1 
-             AND EXTRACT(MONTH FROM data) = $2 
-             AND EXTRACT(YEAR FROM data) = $3), 0
-        ) AS despesas_mes,
-        
-        -- Cartões ativos
-        COALESCE(
-          (SELECT COUNT(*) FROM cards WHERE user_id = $1), 0
-        ) AS cartoes_ativos,
-        
-        -- Categorias ativas
-        COALESCE(
-          (SELECT COUNT(*) FROM categories WHERE user_id = $1), 0
-        ) AS categorias_ativas,
-        
-        -- Transações do mês
-        COALESCE(
-          (SELECT COUNT(*) FROM expenses 
-           WHERE user_id = $1 
-             AND EXTRACT(MONTH FROM data) = $2 
-             AND EXTRACT(YEAR FROM data) = $3), 0
-        ) + 
-        COALESCE(
-          (SELECT COUNT(*) FROM incomes 
-           WHERE user_id = $1 
-             AND EXTRACT(MONTH FROM data) = $2 
-             AND EXTRACT(YEAR FROM data) = $3), 0
-        ) AS transacoes_mes`,
-            [userId, mes, ano]
-        )
+        const result = await prisma.$queryRaw<Array<{
+            saldo_atual: string
+            receitas_mes: string
+            despesas_mes: string
+            cartoes_ativos: bigint
+            categorias_ativas: bigint
+            transacoes_mes: bigint
+        }>>`
+            SELECT
+                COALESCE((SELECT SUM(quantidade) FROM incomes WHERE user_id = ${userId}), 0) -
+                COALESCE((SELECT SUM(quantidade) FROM expenses WHERE user_id = ${userId}), 0) AS saldo_atual,
+                COALESCE((SELECT SUM(quantidade) FROM incomes WHERE user_id = ${userId} AND EXTRACT(MONTH FROM data) = ${mes} AND EXTRACT(YEAR FROM data) = ${ano}), 0) AS receitas_mes,
+                COALESCE((SELECT SUM(quantidade) FROM expenses WHERE user_id = ${userId} AND EXTRACT(MONTH FROM data) = ${mes} AND EXTRACT(YEAR FROM data) = ${ano}), 0) AS despesas_mes,
+                COALESCE((SELECT COUNT(*) FROM cards WHERE user_id = ${userId}), 0) AS cartoes_ativos,
+                COALESCE((SELECT COUNT(*) FROM categories WHERE user_id = ${userId}), 0) AS categorias_ativas,
+                COALESCE((SELECT COUNT(*) FROM expenses WHERE user_id = ${userId} AND EXTRACT(MONTH FROM data) = ${mes} AND EXTRACT(YEAR FROM data) = ${ano}), 0) +
+                COALESCE((SELECT COUNT(*) FROM incomes WHERE user_id = ${userId} AND EXTRACT(MONTH FROM data) = ${mes} AND EXTRACT(YEAR FROM data) = ${ano}), 0) AS transacoes_mes
+        `
 
-        const stats = result.rows[0]
+        const stats = result[0]
         const receitasMes = Number(stats.receitas_mes)
         const despesasMes = Number(stats.despesas_mes)
 
@@ -492,9 +350,6 @@ export class DashboardService {
         }
     }
 
-    /**
-     * Tendências dos últimos 6 meses
-     */
     static async getTendencias(userId: number): Promise<Array<{
         mes: string
         receitas: number
@@ -502,9 +357,8 @@ export class DashboardService {
         saldo: number
     }>> {
         const now = new Date()
-        const meses = []
+        const meses: Array<{ mes: number; ano: number; nome: string }> = []
 
-        // Gerar últimos 6 meses
         for (let i = 5; i >= 0; i--) {
             const data = new Date(now.getFullYear(), now.getMonth() - i, 1)
             meses.push({
@@ -516,28 +370,16 @@ export class DashboardService {
 
         const tendencias = await Promise.all(
             meses.map(async ({ mes, ano, nome }) => {
-                const result = await pool.query(
-                    `SELECT 
-            COALESCE(
-              (SELECT SUM(quantidade) FROM incomes 
-               WHERE user_id = $1 AND EXTRACT(MONTH FROM data) = $2 AND EXTRACT(YEAR FROM data) = $3), 0
-            ) AS receitas,
-            COALESCE(
-              (SELECT SUM(quantidade) FROM expenses 
-               WHERE user_id = $1 AND EXTRACT(MONTH FROM data) = $2 AND EXTRACT(YEAR FROM data) = $3), 0
-            ) AS despesas`,
-                    [userId, mes, ano]
-                )
+                const result = await prisma.$queryRaw<Array<{ receitas: string; despesas: string }>>`
+                    SELECT
+                        COALESCE((SELECT SUM(quantidade) FROM incomes WHERE user_id = ${userId} AND EXTRACT(MONTH FROM data) = ${mes} AND EXTRACT(YEAR FROM data) = ${ano}), 0) AS receitas,
+                        COALESCE((SELECT SUM(quantidade) FROM expenses WHERE user_id = ${userId} AND EXTRACT(MONTH FROM data) = ${mes} AND EXTRACT(YEAR FROM data) = ${ano}), 0) AS despesas
+                `
 
-                const receitas = Number(result.rows[0].receitas)
-                const despesas = Number(result.rows[0].despesas)
+                const receitas = Number(result[0].receitas)
+                const despesas = Number(result[0].despesas)
 
-                return {
-                    mes: nome,
-                    receitas,
-                    despesas,
-                    saldo: receitas - despesas
-                }
+                return { mes: nome, receitas, despesas, saldo: receitas - despesas }
             })
         )
 

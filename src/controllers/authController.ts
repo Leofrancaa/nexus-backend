@@ -2,13 +2,12 @@
 import { Request, Response } from 'express'
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
-import { pool } from '../database/index'
+import prisma from '../database/prisma'
 import {
     User,
     LoginRequest,
     RegisterRequest,
     AuthResponse,
-    QueryResult
 } from '../types/index'
 import { generateResetToken, sendPasswordResetEmail } from '../services/emailService'
 import { markInviteCodeAsUsed } from './inviteCodeController'
@@ -21,146 +20,81 @@ export const registerUser = async (req: Request<{}, AuthResponse, RegisterReques
 
         console.log('[registerUser] Iniciando registro para:', email)
 
-        // Validação de entrada
         if (!nome || !email || !senha) {
-            res.status(400).json({
-                success: false,
-                message: 'Nome, e-mail e senha são obrigatórios.',
-                error: 'Nome, e-mail e senha são obrigatórios.'
-            } as any)
+            res.status(400).json({ success: false, message: 'Nome, e-mail e senha são obrigatórios.', error: 'Nome, e-mail e senha são obrigatórios.' } as any)
             return
         }
 
-        // Validar código de convite
         if (!inviteCode) {
-            res.status(400).json({
-                success: false,
-                message: 'Código de convite é obrigatório.',
-                error: 'Código de convite é obrigatório.'
-            } as any)
+            res.status(400).json({ success: false, message: 'Código de convite é obrigatório.', error: 'Código de convite é obrigatório.' } as any)
             return
         }
 
-        // Verificar se o código de convite é válido
-        const inviteResult = await pool.query(
-            `SELECT id, code, is_used, expires_at
-             FROM invite_codes
-             WHERE code = $1`,
-            [inviteCode.toUpperCase()]
-        )
+        const invite = await prisma.inviteCode.findFirst({
+            where: { code: inviteCode.toUpperCase() }
+        })
 
-        if (inviteResult.rows.length === 0) {
-            res.status(400).json({
-                success: false,
-                message: 'Código de convite inválido.',
-                error: 'Código de convite inválido.'
-            } as any)
+        if (!invite) {
+            res.status(400).json({ success: false, message: 'Código de convite inválido.', error: 'Código de convite inválido.' } as any)
             return
         }
-
-        const invite = inviteResult.rows[0]
 
         if (invite.is_used) {
-            res.status(400).json({
-                success: false,
-                message: 'Este código de convite já foi utilizado.',
-                error: 'Este código de convite já foi utilizado.'
-            } as any)
+            res.status(400).json({ success: false, message: 'Este código de convite já foi utilizado.', error: 'Este código de convite já foi utilizado.' } as any)
             return
         }
 
         if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
-            res.status(400).json({
-                success: false,
-                message: 'Este código de convite expirou.',
-                error: 'Este código de convite expirou.'
-            } as any)
+            res.status(400).json({ success: false, message: 'Este código de convite expirou.', error: 'Este código de convite expirou.' } as any)
             return
         }
 
-        // Validação de email
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
         if (!emailRegex.test(email)) {
-            res.status(400).json({
-                success: false,
-                message: 'Email inválido.',
-                error: 'Email inválido.'
-            } as any)
+            res.status(400).json({ success: false, message: 'Email inválido.', error: 'Email inválido.' } as any)
             return
         }
 
-        // Validação de senha
         if (senha.length < 6) {
-            res.status(400).json({
-                success: false,
-                message: 'Senha deve ter pelo menos 6 caracteres.',
-                error: 'Senha deve ter pelo menos 6 caracteres.'
-            } as any)
+            res.status(400).json({ success: false, message: 'Senha deve ter pelo menos 6 caracteres.', error: 'Senha deve ter pelo menos 6 caracteres.' } as any)
             return
         }
 
-        // Verificar se usuário já existe
-        const existsResult: QueryResult<{ id: number }> = await pool.query(
-            'SELECT id FROM users WHERE email = $1',
-            [email]
-        )
+        const existingUser = await prisma.user.findUnique({ where: { email: email.toLowerCase() } })
 
-        if (existsResult.rowCount && existsResult.rowCount > 0) {
-            res.status(409).json({
-                success: false,
-                message: 'E-mail já cadastrado.',
-                error: 'E-mail já cadastrado.'
-            } as any)
+        if (existingUser) {
+            res.status(409).json({ success: false, message: 'E-mail já cadastrado.', error: 'E-mail já cadastrado.' } as any)
             return
         }
 
-        // Hash da senha
         const hashedPassword = await bcrypt.hash(senha, 12)
 
-        // Inserir usuário
-        const result: QueryResult<Omit<User, 'senha'>> = await pool.query(
-            `INSERT INTO users (nome, email, senha, currency, accepted_terms, accepted_terms_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())
-       RETURNING id, nome, email, currency, created_at, updated_at`,
-            [nome, email.toLowerCase(), hashedPassword, 'BRL', true]
-        )
+        const user = await prisma.user.create({
+            data: {
+                nome,
+                email: email.toLowerCase(),
+                senha: hashedPassword,
+                currency: 'BRL',
+                accepted_terms: true,
+                accepted_terms_at: new Date(),
+            },
+            select: { id: true, nome: true, email: true, currency: true, created_at: true, updated_at: true }
+        })
 
-        const user = result.rows[0]
-
-        // Marcar código de convite como usado
         await markInviteCodeAsUsed(inviteCode.toUpperCase(), user.id)
 
-        // Gerar token JWT (7 dias de validade)
         const token = jwt.sign(
             { id: user.id, nome: user.nome, email: user.email },
             JWT_SECRET,
             { expiresIn: '7d' }
         )
 
-        console.log('[registerUser] Token gerado:', token ? 'SUCCESS' : 'FAILED', token ? token.length : 0)
+        console.log('[registerUser] Token gerado:', token ? 'SUCCESS' : 'FAILED')
 
-        const response = {
-            success: true,
-            message: 'Usuário registrado com sucesso',
-            user,
-            token
-        }
-
-        console.log('[registerUser] Enviando resposta:', {
-            success: response.success,
-            hasUser: !!response.user,
-            hasToken: !!response.token,
-            tokenLength: response.token ? response.token.length : 0
-        })
-
-        res.status(201).json(response)
+        res.status(201).json({ success: true, message: 'Usuário registrado com sucesso', user, token })
     } catch (error) {
         console.error('[registerUser] Erro:', error)
-        res.status(500).json({
-            success: false,
-            message: 'Erro interno do servidor',
-            error: 'Erro ao registrar usuário.'
-        } as any)
+        res.status(500).json({ success: false, message: 'Erro interno do servidor', error: 'Erro ao registrar usuário.' } as any)
     }
 }
 
@@ -169,205 +103,103 @@ export const loginUser = async (req: Request<{}, AuthResponse, LoginRequest>, re
         const { email, senha } = req.body
 
         console.log('[loginUser] Iniciando login para:', email)
-        console.log('[loginUser] JWT_SECRET definido:', !!JWT_SECRET)
 
-        // Validação de entrada
         if (!email || !senha) {
-            console.log('[loginUser] Erro: Campos obrigatórios não preenchidos')
-            res.status(400).json({
-                success: false,
-                message: 'E-mail e senha são obrigatórios.',
-                error: 'E-mail e senha são obrigatórios.'
-            } as any)
+            res.status(400).json({ success: false, message: 'E-mail e senha são obrigatórios.', error: 'E-mail e senha são obrigatórios.' } as any)
             return
         }
 
-        // Buscar usuário
-        console.log('[loginUser] Buscando usuário no banco...')
-        const result: QueryResult<User> = await pool.query(
-            'SELECT id, nome, email, senha, currency, created_at, updated_at FROM users WHERE email = $1',
-            [email.toLowerCase()]
-        )
+        const user = await prisma.user.findUnique({
+            where: { email: email.toLowerCase() },
+            select: { id: true, nome: true, email: true, senha: true, currency: true, created_at: true, updated_at: true }
+        })
 
-        if (result.rowCount === 0) {
-            console.log('[loginUser] Usuário não encontrado')
-            res.status(400).json({
-                success: false,
-                message: 'Credenciais inválidas.',
-                error: 'E-mail ou senha incorretos.'
-            } as any)
+        if (!user) {
+            res.status(400).json({ success: false, message: 'Credenciais inválidas.', error: 'E-mail ou senha incorretos.' } as any)
             return
         }
 
-        const user = result.rows[0]
-        console.log('[loginUser] Usuário encontrado:', { id: user.id, email: user.email })
-
-        // Verificar senha
         if (!user.senha) {
-            console.log('[loginUser] Erro: Usuário sem senha no banco')
-            res.status(500).json({
-                success: false,
-                message: 'Erro interno do servidor',
-                error: 'Dados do usuário inconsistentes.'
-            } as any)
+            res.status(500).json({ success: false, message: 'Erro interno do servidor', error: 'Dados do usuário inconsistentes.' } as any)
             return
         }
 
-        console.log('[loginUser] Verificando senha...')
         const isPasswordCorrect = await bcrypt.compare(senha, user.senha)
 
         if (!isPasswordCorrect) {
-            console.log('[loginUser] Senha incorreta')
-            res.status(401).json({
-                success: false,
-                message: 'Credenciais inválidas.',
-                error: 'E-mail ou senha incorretos.'
-            } as any)
+            res.status(401).json({ success: false, message: 'Credenciais inválidas.', error: 'E-mail ou senha incorretos.' } as any)
             return
         }
 
-        console.log('[loginUser] Senha correta, gerando token...')
-
-        // Gerar token JWT (7 dias de validade)
         const token = jwt.sign(
             { id: user.id, nome: user.nome, email: user.email },
             JWT_SECRET,
             { expiresIn: '7d' }
         )
 
-        console.log('[loginUser] Token gerado:', token ? 'SUCCESS' : 'FAILED')
-        console.log('[loginUser] Token length:', token ? token.length : 0)
-        console.log('[loginUser] Token preview:', token ? token.substring(0, 20) + '...' : 'N/A')
-
-        // Remover senha do retorno
         const { senha: _, ...userWithoutPassword } = user
 
-        const response = {
-            success: true,
-            message: 'Login realizado com sucesso',
-            user: userWithoutPassword,
-            token
-        }
+        console.log('[loginUser] Login realizado com sucesso para:', email)
 
-        console.log('[loginUser] Preparando resposta:', {
-            success: response.success,
-            hasUser: !!response.user,
-            hasToken: !!response.token,
-            tokenLength: response.token ? response.token.length : 0,
-            userKeys: response.user ? Object.keys(response.user) : []
-        })
-
-        console.log('[loginUser] Enviando resposta com status 200...')
-        res.status(200).json(response)
-        console.log('[loginUser] Resposta enviada com sucesso!')
-
+        res.status(200).json({ success: true, message: 'Login realizado com sucesso', user: userWithoutPassword, token })
     } catch (error) {
         console.error('[loginUser] Erro inesperado:', error)
-        res.status(500).json({
-            success: false,
-            message: 'Erro interno do servidor',
-            error: 'Erro ao fazer login.'
-        } as any)
+        res.status(500).json({ success: false, message: 'Erro interno do servidor', error: 'Erro ao fazer login.' } as any)
     }
 }
 
 export const logoutUser = async (req: Request, res: Response): Promise<void> => {
-    console.log('[logoutUser] Processando logout')
-    // Com Bearer token, o logout é feito no frontend removendo o token
-    // Não há necessidade de invalidar no servidor (stateless)
-    res.status(200).json({
-        success: true,
-        message: 'Logout realizado com sucesso. Remova o token do cliente.'
-    })
+    res.status(200).json({ success: true, message: 'Logout realizado com sucesso. Remova o token do cliente.' })
 }
 
 export const changePassword = async (req: Request, res: Response): Promise<void> => {
     try {
-        const userId = (req as any).user?.id // ID do usuário autenticado vindo do middleware
+        const userId = (req as any).user?.id
         const { senhaAtual, novaSenha } = req.body
 
-        console.log('[changePassword] Iniciando alteração de senha para usuário:', userId)
-
-        // Validação de entrada
         if (!senhaAtual || !novaSenha) {
-            res.status(400).json({
-                success: false,
-                message: 'Senha atual e nova senha são obrigatórias.',
-                error: 'Senha atual e nova senha são obrigatórias.'
-            })
+            res.status(400).json({ success: false, message: 'Senha atual e nova senha são obrigatórias.', error: 'Senha atual e nova senha são obrigatórias.' })
             return
         }
 
-        // Validação da nova senha
         if (novaSenha.length < 6) {
-            res.status(400).json({
-                success: false,
-                message: 'A nova senha deve ter pelo menos 6 caracteres.',
-                error: 'A nova senha deve ter pelo menos 6 caracteres.'
-            })
+            res.status(400).json({ success: false, message: 'A nova senha deve ter pelo menos 6 caracteres.', error: 'A nova senha deve ter pelo menos 6 caracteres.' })
             return
         }
 
-        // Buscar usuário com senha
-        const result: QueryResult<User> = await pool.query(
-            'SELECT id, senha FROM users WHERE id = $1',
-            [userId]
-        )
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true, senha: true }
+        })
 
-        if (result.rowCount === 0) {
-            res.status(404).json({
-                success: false,
-                message: 'Usuário não encontrado.',
-                error: 'Usuário não encontrado.'
-            })
+        if (!user) {
+            res.status(404).json({ success: false, message: 'Usuário não encontrado.', error: 'Usuário não encontrado.' })
             return
         }
 
-        const user = result.rows[0]
-
-        // Verificar senha atual
         if (!user.senha) {
-            res.status(500).json({
-                success: false,
-                message: 'Erro interno do servidor',
-                error: 'Dados do usuário inconsistentes.'
-            })
+            res.status(500).json({ success: false, message: 'Erro interno do servidor', error: 'Dados do usuário inconsistentes.' })
             return
         }
 
         const isPasswordCorrect = await bcrypt.compare(senhaAtual, user.senha)
 
         if (!isPasswordCorrect) {
-            res.status(401).json({
-                success: false,
-                message: 'Senha atual incorreta.',
-                error: 'Senha atual incorreta.'
-            })
+            res.status(401).json({ success: false, message: 'Senha atual incorreta.', error: 'Senha atual incorreta.' })
             return
         }
 
-        // Hash da nova senha
         const hashedPassword = await bcrypt.hash(novaSenha, 12)
 
-        // Atualizar senha no banco
-        await pool.query(
-            'UPDATE users SET senha = $1, updated_at = NOW() WHERE id = $2',
-            [hashedPassword, userId]
-        )
-
-        console.log('[changePassword] Senha alterada com sucesso para usuário:', userId)
-
-        res.status(200).json({
-            success: true,
-            message: 'Senha alterada com sucesso.'
+        await prisma.user.update({
+            where: { id: userId },
+            data: { senha: hashedPassword }
         })
+
+        res.status(200).json({ success: true, message: 'Senha alterada com sucesso.' })
     } catch (error) {
         console.error('[changePassword] Erro:', error)
-        res.status(500).json({
-            success: false,
-            message: 'Erro interno do servidor',
-            error: 'Erro ao alterar senha.'
-        })
+        res.status(500).json({ success: false, message: 'Erro interno do servidor', error: 'Erro ao alterar senha.' })
     }
 }
 
@@ -375,88 +207,51 @@ export const requestPasswordReset = async (req: Request, res: Response): Promise
     try {
         const { email } = req.body
 
-        console.log('[requestPasswordReset] Solicitação de recuperação para:', email)
-
-        // Validação de entrada
         if (!email) {
-            res.status(400).json({
-                success: false,
-                message: 'Email é obrigatório.',
-                error: 'Email é obrigatório.'
-            })
+            res.status(400).json({ success: false, message: 'Email é obrigatório.', error: 'Email é obrigatório.' })
             return
         }
 
-        // Validação de email
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
         if (!emailRegex.test(email)) {
-            res.status(400).json({
-                success: false,
-                message: 'Email inválido.',
-                error: 'Email inválido.'
-            })
+            res.status(400).json({ success: false, message: 'Email inválido.', error: 'Email inválido.' })
             return
         }
 
-        // Buscar usuário
-        const result: QueryResult<User> = await pool.query(
-            'SELECT id, nome, email FROM users WHERE email = $1',
-            [email.toLowerCase()]
-        )
+        const user = await prisma.user.findUnique({
+            where: { email: email.toLowerCase() },
+            select: { id: true, nome: true, email: true }
+        })
 
-        // Por segurança, sempre retornar sucesso mesmo se o email não existir
-        // Isso evita que atacantes descubram quais emails estão cadastrados
-        if (result.rowCount === 0) {
-            console.log('[requestPasswordReset] Email não encontrado, mas retornando sucesso por segurança')
-            res.status(200).json({
-                success: true,
-                message: 'Se o email estiver cadastrado, você receberá um link de recuperação.'
-            })
+        if (!user) {
+            res.status(200).json({ success: true, message: 'Se o email estiver cadastrado, você receberá um link de recuperação.' })
             return
         }
 
-        const user = result.rows[0]
-
-        // Gerar token de recuperação
         const resetToken = generateResetToken()
-        const resetExpires = new Date(Date.now() + 3600000) // 1 hora
+        const resetExpires = new Date(Date.now() + 3600000)
 
-        // Salvar token no banco
-        await pool.query(
-            'UPDATE users SET reset_password_token = $1, reset_password_expires = $2 WHERE id = $3',
-            [resetToken, resetExpires, user.id]
-        )
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { reset_password_token: resetToken, reset_password_expires: resetExpires }
+        })
 
-        // Enviar email
         try {
             await sendPasswordResetEmail(user.email, resetToken, user.nome)
-            console.log('[requestPasswordReset] Email enviado com sucesso para:', user.email)
         } catch (emailError) {
             console.error('[requestPasswordReset] Erro ao enviar email:', emailError)
-            // Limpar token se falhou ao enviar email
-            await pool.query(
-                'UPDATE users SET reset_password_token = NULL, reset_password_expires = NULL WHERE id = $1',
-                [user.id]
-            )
-            res.status(500).json({
-                success: false,
-                message: 'Erro ao enviar email de recuperação. Tente novamente mais tarde.',
-                error: 'Erro ao enviar email.'
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { reset_password_token: null, reset_password_expires: null }
             })
+            res.status(500).json({ success: false, message: 'Erro ao enviar email de recuperação. Tente novamente mais tarde.', error: 'Erro ao enviar email.' })
             return
         }
 
-        res.status(200).json({
-            success: true,
-            message: 'Se o email estiver cadastrado, você receberá um link de recuperação.'
-        })
+        res.status(200).json({ success: true, message: 'Se o email estiver cadastrado, você receberá um link de recuperação.' })
     } catch (error) {
         console.error('[requestPasswordReset] Erro:', error)
-        res.status(500).json({
-            success: false,
-            message: 'Erro interno do servidor',
-            error: 'Erro ao processar solicitação.'
-        })
+        res.status(500).json({ success: false, message: 'Erro interno do servidor', error: 'Erro ao processar solicitação.' })
     }
 }
 
@@ -464,66 +259,41 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
     try {
         const { token, novaSenha } = req.body
 
-        console.log('[resetPassword] Iniciando redefinição de senha com token')
-
-        // Validação de entrada
         if (!token || !novaSenha) {
-            res.status(400).json({
-                success: false,
-                message: 'Token e nova senha são obrigatórios.',
-                error: 'Token e nova senha são obrigatórios.'
-            })
+            res.status(400).json({ success: false, message: 'Token e nova senha são obrigatórios.', error: 'Token e nova senha são obrigatórios.' })
             return
         }
 
-        // Validação da nova senha
         if (novaSenha.length < 6) {
-            res.status(400).json({
-                success: false,
-                message: 'A nova senha deve ter pelo menos 6 caracteres.',
-                error: 'A nova senha deve ter pelo menos 6 caracteres.'
-            })
+            res.status(400).json({ success: false, message: 'A nova senha deve ter pelo menos 6 caracteres.', error: 'A nova senha deve ter pelo menos 6 caracteres.' })
             return
         }
 
-        // Buscar usuário com token válido
-        const result: QueryResult<User> = await pool.query(
-            'SELECT id, email, nome FROM users WHERE reset_password_token = $1 AND reset_password_expires > NOW()',
-            [token]
-        )
+        const user = await prisma.user.findFirst({
+            where: {
+                reset_password_token: token,
+                reset_password_expires: { gt: new Date() }
+            },
+            select: { id: true, email: true, nome: true }
+        })
 
-        if (result.rowCount === 0) {
-            res.status(400).json({
-                success: false,
-                message: 'Token inválido ou expirado.',
-                error: 'Token inválido ou expirado.'
-            })
+        if (!user) {
+            res.status(400).json({ success: false, message: 'Token inválido ou expirado.', error: 'Token inválido ou expirado.' })
             return
         }
 
-        const user = result.rows[0]
-
-        // Hash da nova senha
         const hashedPassword = await bcrypt.hash(novaSenha, 12)
 
-        // Atualizar senha e limpar token
-        await pool.query(
-            'UPDATE users SET senha = $1, reset_password_token = NULL, reset_password_expires = NULL, updated_at = NOW() WHERE id = $2',
-            [hashedPassword, user.id]
-        )
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { senha: hashedPassword, reset_password_token: null, reset_password_expires: null }
+        })
 
         console.log('[resetPassword] Senha redefinida com sucesso para usuário:', user.email)
 
-        res.status(200).json({
-            success: true,
-            message: 'Senha redefinida com sucesso. Você já pode fazer login.'
-        })
+        res.status(200).json({ success: true, message: 'Senha redefinida com sucesso. Você já pode fazer login.' })
     } catch (error) {
         console.error('[resetPassword] Erro:', error)
-        res.status(500).json({
-            success: false,
-            message: 'Erro interno do servidor',
-            error: 'Erro ao redefinir senha.'
-        })
+        res.status(500).json({ success: false, message: 'Erro interno do servidor', error: 'Erro ao redefinir senha.' })
     }
 }

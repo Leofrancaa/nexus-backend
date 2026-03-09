@@ -1,15 +1,6 @@
 // src/utils/finance/getParcelasPendentes.ts
-import { DatabaseUtils } from '../database'
+import prisma from '../../database/prisma'
 import { formatDate } from '../helper'
-
-interface ParcelasPendentesQueryResult {
-    id: number
-    metodo_pagamento: string
-    tipo: string
-    quantidade: string
-    data: string
-    parcelas: number
-}
 
 export interface ParcelasPendentesResult {
     id: number
@@ -21,23 +12,31 @@ export interface ParcelasPendentesResult {
 }
 
 export const getParcelasPendentes = async (user_id: number): Promise<ParcelasPendentesResult[]> => {
-    const today = formatDate(new Date())
+    const today = new Date(formatDate(new Date()))
 
-    const result = await DatabaseUtils.findMany<ParcelasPendentesQueryResult>(
-        `SELECT * FROM expenses
-         WHERE user_id = $1
-         AND parcelas IS NOT NULL
-         AND data >= $2
-         ORDER BY data ASC`,
-        [user_id, today]
-    )
+    const expenses = await prisma.expense.findMany({
+        where: {
+            user_id,
+            parcelas: { not: null },
+            data: { gte: today },
+        },
+        orderBy: { data: 'asc' },
+        select: {
+            id: true,
+            metodo_pagamento: true,
+            tipo: true,
+            quantidade: true,
+            data: true,
+            parcelas: true,
+        },
+    })
 
-    return result.map(row => ({
-        id: row.id,
-        metodo_pagamento: row.metodo_pagamento,
-        tipo: row.tipo,
-        quantidade: parseFloat(row.quantidade),
-        data: row.data,
-        parcelas: row.parcelas
+    return expenses.map(e => ({
+        id: e.id,
+        metodo_pagamento: e.metodo_pagamento,
+        tipo: e.tipo,
+        quantidade: Number(e.quantidade),
+        data: e.data instanceof Date ? e.data.toISOString().split('T')[0] : String(e.data),
+        parcelas: e.parcelas!,
     }))
 }

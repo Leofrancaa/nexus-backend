@@ -1,38 +1,33 @@
 // src/utils/finance/getGastosPorCategoria.ts
-import { DatabaseUtils } from '../database'
-
-interface GastosPorCategoriaQueryResult {
-  id: number
-  nome: string
-  total: string
-}
+import prisma from '../../database/prisma'
 
 export interface GastosPorCategoriaResult {
-  id: number
-  nome: string
-  total: number
+    id: number
+    nome: string
+    total: number
+}
+
+interface RawRow {
+    id: number
+    nome: string
+    total: string | number
 }
 
 export const getGastosPorCategoria = async (
-  user_id: number,
-  mes: number,
-  ano: number
+    user_id: number,
+    mes: number,
+    ano: number
 ): Promise<GastosPorCategoriaResult[]> => {
-  const result = await DatabaseUtils.findMany<GastosPorCategoriaQueryResult>(
-    `SELECT c.id, c.nome, SUM(e.quantidade) as total
-         FROM expenses e
-         JOIN categories c ON e.category_id = c.id
-         WHERE e.user_id = $1
-           AND EXTRACT(MONTH FROM e.data) = $2
-           AND EXTRACT(YEAR FROM e.data) = $3
-         GROUP BY c.id, c.nome
-         ORDER BY total DESC`,
-    [user_id, mes, ano]
-  )
+    const rows = await prisma.$queryRaw<RawRow[]>`
+        SELECT c.id, c.nome, SUM(e.quantidade) as total
+        FROM expenses e
+        JOIN categories c ON e.category_id = c.id
+        WHERE e.user_id = ${user_id}
+        AND EXTRACT(MONTH FROM e.data) = ${mes}
+        AND EXTRACT(YEAR FROM e.data) = ${ano}
+        GROUP BY c.id, c.nome
+        ORDER BY total DESC
+    `
 
-  return result.map(row => ({
-    id: row.id,
-    nome: row.nome,
-    total: parseFloat(row.total)
-  }))
+    return rows.map(row => ({ id: row.id, nome: row.nome, total: Number(row.total) }))
 }

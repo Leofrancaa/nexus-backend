@@ -1,5 +1,5 @@
 // src/utils/finance/saveExpenseHistory.ts
-import { DatabaseUtils } from '../database'
+import prisma from '../../database/prisma'
 
 interface SaveExpenseHistoryParams {
     expense_id: number
@@ -12,11 +12,10 @@ export const saveExpenseHistory = async ({
     expense_id,
     user_id,
     tipo,
-    alteracao
+    alteracao,
 }: SaveExpenseHistoryParams): Promise<void> => {
-    await DatabaseUtils.query(
-        `INSERT INTO expense_history (expense_id, user_id, tipo, alteracao)
-         VALUES ($1, $2, $3, $4)`,
-        [expense_id, user_id, tipo, alteracao]
-    )
+    await prisma.$executeRaw`
+        INSERT INTO expense_history (expense_id, user_id, tipo, alteracao)
+        VALUES (${expense_id}, ${user_id}, ${tipo}, ${JSON.stringify(alteracao)}::jsonb)
+    `
 }

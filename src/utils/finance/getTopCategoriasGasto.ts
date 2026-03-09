@@ -1,14 +1,14 @@
 // src/utils/finance/getTopCategoriasGasto.ts
-import { DatabaseUtils } from '../database'
-
-interface TopCategoriasQueryResult {
-    nome: string
-    total: string
-}
+import prisma from '../../database/prisma'
 
 export interface TopCategoriasResult {
     nome: string
     total: number
+}
+
+interface RawRow {
+    nome: string
+    total: string | number
 }
 
 export const getTopCategoriasGasto = async (
@@ -16,21 +16,17 @@ export const getTopCategoriasGasto = async (
     mes: number,
     ano: number
 ): Promise<TopCategoriasResult[]> => {
-    const result = await DatabaseUtils.findMany<TopCategoriasQueryResult>(
-        `SELECT c.nome, SUM(e.quantidade) AS total
-         FROM expenses e
-         JOIN categories c ON e.category_id = c.id
-         WHERE e.user_id = $1
-         AND EXTRACT(MONTH FROM e.data) = $2
-         AND EXTRACT(YEAR FROM e.data) = $3
-         GROUP BY c.nome
-         ORDER BY total DESC
-         LIMIT 5`,
-        [user_id, mes, ano]
-    )
+    const rows = await prisma.$queryRaw<RawRow[]>`
+        SELECT c.nome, SUM(e.quantidade) AS total
+        FROM expenses e
+        JOIN categories c ON e.category_id = c.id
+        WHERE e.user_id = ${user_id}
+        AND EXTRACT(MONTH FROM e.data) = ${mes}
+        AND EXTRACT(YEAR FROM e.data) = ${ano}
+        GROUP BY c.nome
+        ORDER BY total DESC
+        LIMIT 5
+    `
 
-    return result.map(row => ({
-        nome: row.nome,
-        total: parseFloat(row.total)
-    }))
+    return rows.map(row => ({ nome: row.nome, total: Number(row.total) }))
 }

@@ -1,7 +1,7 @@
 // src/controllers/expenseController.ts
 import { Request, Response, NextFunction } from 'express'
 import { ExpenseService } from '../services/expenseService'
-import { DatabaseUtils } from '../utils/database'
+import prisma from '../database/prisma'
 import {
     AuthenticatedRequest,
     CreateExpenseRequest,
@@ -323,17 +323,15 @@ export const getExpensesByMonth = async (
         const authReq = req as AuthenticatedRequest
         const userId = authReq.user.id
 
-        // Query para buscar despesas agrupadas por mês usando DatabaseUtils
-        const result = await DatabaseUtils.query<ExpenseMonthlyResult>(
-            `SELECT 
+        const rows = await prisma.$queryRaw<ExpenseMonthlyResult[]>`
+            SELECT
                 EXTRACT(MONTH FROM data) AS numero_mes,
                 SUM(quantidade) AS total
-             FROM expenses
-             WHERE user_id = $1
-             GROUP BY numero_mes
-             ORDER BY numero_mes`,
-            [userId]
-        )
+            FROM expenses
+            WHERE user_id = ${userId}
+            GROUP BY numero_mes
+            ORDER BY numero_mes
+        `
 
         const meses = [
             "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
@@ -341,7 +339,7 @@ export const getExpensesByMonth = async (
         ]
 
         const dados = meses.map((mes, index) => {
-            const encontrado = result.rows.find((r: ExpenseMonthlyResult) =>
+            const encontrado = rows.find((r: ExpenseMonthlyResult) =>
                 Number(r.numero_mes) === index + 1
             )
             return {

@@ -1,14 +1,14 @@
 // src/utils/finance/getGastosPorCartao.ts
-import { DatabaseUtils } from '../database'
-
-interface GastosPorCartaoQueryResult {
-    cartao: string
-    total: string
-}
+import prisma from '../../database/prisma'
 
 export interface GastosPorCartaoResult {
     cartao: string
     total: number
+}
+
+interface RawRow {
+    cartao: string
+    total: string | number
 }
 
 export const getGastosPorCartao = async (
@@ -16,20 +16,16 @@ export const getGastosPorCartao = async (
     mes: number,
     ano: number
 ): Promise<GastosPorCartaoResult[]> => {
-    const result = await DatabaseUtils.findMany<GastosPorCartaoQueryResult>(
-        `SELECT c.nome AS cartao, SUM(e.quantidade) AS total
-         FROM expenses e
-         JOIN cards c ON e.card_id = c.id
-         WHERE e.user_id = $1
-         AND EXTRACT(MONTH FROM e.data) = $2
-         AND EXTRACT(YEAR FROM e.data) = $3
-         GROUP BY c.nome
-         ORDER BY total DESC`,
-        [user_id, mes, ano]
-    )
+    const rows = await prisma.$queryRaw<RawRow[]>`
+        SELECT c.nome AS cartao, SUM(e.quantidade) AS total
+        FROM expenses e
+        JOIN cards c ON e.card_id = c.id
+        WHERE e.user_id = ${user_id}
+        AND EXTRACT(MONTH FROM e.data) = ${mes}
+        AND EXTRACT(YEAR FROM e.data) = ${ano}
+        GROUP BY c.nome
+        ORDER BY total DESC
+    `
 
-    return result.map(row => ({
-        cartao: row.cartao,
-        total: parseFloat(row.total)
-    }))
+    return rows.map(row => ({ cartao: row.cartao, total: Number(row.total) }))
 }

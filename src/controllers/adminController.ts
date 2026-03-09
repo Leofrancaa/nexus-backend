@@ -1,34 +1,30 @@
 // src/controllers/adminController.ts
-import { Request, Response } from 'express';
-import { pool } from '../database/index';
+import { Request, Response } from 'express'
+import prisma from '../database/prisma'
 
-// Listar todos os usuários (somente para admin)
 export const listAllUsers = async (req: Request, res: Response) => {
-    console.log('🔍 [adminController] listAllUsers chamado');
+    console.log('🔍 [adminController] listAllUsers chamado')
     try {
-        const result = await pool.query(
-            `SELECT
-                id,
-                nome,
-                email,
-                created_at,
-                accepted_terms_at
-             FROM users
-             ORDER BY created_at DESC`
-        );
+        const users = await prisma.user.findMany({
+            select: {
+                id: true,
+                nome: true,
+                email: true,
+                created_at: true,
+                accepted_terms_at: true,
+            },
+            orderBy: { created_at: 'desc' },
+        })
 
-        console.log('🔍 [adminController] Usuários encontrados:', result.rows.length);
-        console.log('🔍 [adminController] Dados:', result.rows);
+        console.log('🔍 [adminController] Usuários encontrados:', users.length)
+        console.log('🔍 [adminController] Dados:', users)
 
-        res.json({
-            success: true,
-            data: result.rows
-        });
+        res.json({ success: true, data: users })
     } catch (error) {
-        console.error('❌ [adminController] Erro ao listar usuários:', error);
+        console.error('❌ [adminController] Erro ao listar usuários:', error)
         res.status(500).json({
             success: false,
-            message: 'Erro ao listar usuários'
-        });
+            message: 'Erro ao listar usuários',
+        })
     }
-};
+}

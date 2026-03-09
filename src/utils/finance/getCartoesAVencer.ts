@@ -1,13 +1,5 @@
 // src/utils/finance/getCartoesAVencer.ts
-import { DatabaseUtils } from '../database'
-
-interface CartoesAVencerQueryResult {
-    id: number
-    nome: string
-    limite: string
-    total_gasto: string
-    dia_vencimento: number
-}
+import prisma from '../../database/prisma'
 
 export interface CartoesAVencerResult {
     id: number
@@ -17,35 +9,41 @@ export interface CartoesAVencerResult {
     dia_vencimento: number
 }
 
+interface RawRow {
+    id: number
+    nome: string
+    limite: string | number
+    total_gasto: string | number
+    dia_vencimento: number
+}
+
 export const getCartoesAVencer = async (user_id: number): Promise<CartoesAVencerResult[]> => {
     const hoje = new Date()
     const diaHoje = hoje.getDate()
 
-    // Gerar um array de 5 dias a partir de hoje (ex: 28, 29, 30, 1, 2)
     const dias: number[] = []
     for (let i = 0; i <= 5; i++) {
         const dataTemp = new Date(hoje)
         dataTemp.setDate(diaHoje + i)
-        dias.push(dataTemp.getDate()) // pega só o dia do mês (1-31)
+        dias.push(dataTemp.getDate())
     }
 
-    const result = await DatabaseUtils.findMany<CartoesAVencerQueryResult>(
-        `SELECT 
+    const rows = await prisma.$queryRaw<RawRow[]>`
+        SELECT
             id, nome, limite,
-            (SELECT COALESCE(SUM(quantidade), 0) 
-             FROM expenses 
-             WHERE card_id = cards.id AND user_id = $1) AS total_gasto,
+            (SELECT COALESCE(SUM(quantidade), 0)
+             FROM expenses
+             WHERE card_id = cards.id AND user_id = ${user_id}) AS total_gasto,
             dia_vencimento
-         FROM cards
-         WHERE user_id = $1 AND dia_vencimento = ANY($2::int[])`,
-        [user_id, dias]
-    )
+        FROM cards
+        WHERE user_id = ${user_id} AND dia_vencimento = ANY(${dias}::int[])
+    `
 
-    return result.map(row => ({
+    return rows.map(row => ({
         id: row.id,
         nome: row.nome,
-        limite: parseFloat(row.limite),
-        total_gasto: parseFloat(row.total_gasto),
-        dia_vencimento: row.dia_vencimento
+        limite: Number(row.limite),
+        total_gasto: Number(row.total_gasto),
+        dia_vencimento: row.dia_vencimento,
     }))
 }
